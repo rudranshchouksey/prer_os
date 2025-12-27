@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Map, 
@@ -7,14 +7,17 @@ import {
   Brain, 
   ChevronLeft,
   ChevronRight,
-  Zap
+  Zap,
+  LogOut
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/study-plan', label: 'Study Plan', icon: Map },
   { path: '/tech-vault', label: 'Tech Vault', icon: Database },
   { path: '/simulator', label: 'Interview Simulator', icon: Brain },
@@ -22,7 +25,19 @@ const navItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success('Logged out successfully');
+      navigate('/');
+    } catch (error) {
+      toast.error('Failed to log out');
+    }
+  };
 
   return (
     <motion.aside
@@ -96,8 +111,22 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Collapse Button */}
-      <div className="p-4 border-t border-sidebar-border">
+      {/* User section with Logout */}
+      <div className="p-4 border-t border-sidebar-border space-y-2">
+        {user && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className={cn(
+              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
+              collapsed && "justify-center"
+            )}
+          >
+            <LogOut className="w-4 h-4" />
+            {!collapsed && <span className="ml-2">Logout</span>}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

@@ -10,13 +10,19 @@ import {
   Code,
   Palette,
   Shield,
-  Search
+  Search,
+  Plus,
+  Users
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { GlassCard } from '@/components/ui/glass-card';
 import { techVaultData, Category, Topic, InterviewQuestion } from '@/data/techVaultData';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
+import { useStudyModules } from '@/hooks/useStudyModules';
+import { Badge } from '@/components/ui/badge';
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -247,6 +253,8 @@ function CategorySection({ category }: { category: Category }) {
 
 export default function TechVault() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showContributeModal, setShowContributeModal] = useState(false);
+  const { data: studyModules } = useStudyModules();
 
   const filteredCategories = techVaultData.filter(cat => {
     if (!searchQuery) return true;
@@ -257,6 +265,11 @@ export default function TechVault() {
       cat.questions.some(q => q.question.toLowerCase().includes(query))
     );
   });
+
+  // Get community questions count from DB
+  const communityQuestionsCount = studyModules?.reduce((acc, m) => {
+    return acc + (m.questions?.filter(q => !q.is_system_generated).length || 0);
+  }, 0) || 0;
 
   return (
     <MainLayout>
@@ -276,6 +289,18 @@ export default function TechVault() {
             <p className="text-muted-foreground">
               Your comprehensive study curriculum for Senior Full Stack interviews
             </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {communityQuestionsCount > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                <Users className="w-3 h-3" />
+                {communityQuestionsCount} community
+              </Badge>
+            )}
+            <Button onClick={() => setShowContributeModal(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Contribute
+            </Button>
           </div>
         </div>
 
@@ -335,6 +360,13 @@ export default function TechVault() {
           </div>
         )}
       </motion.div>
+
+      {/* Contribute Modal */}
+      <ContributeQuestionModal
+        isOpen={showContributeModal}
+        onClose={() => setShowContributeModal(false)}
+        modules={studyModules?.map(m => ({ id: m.id, title: m.title, category: m.category })) || []}
+      />
     </MainLayout>
   );
 }
