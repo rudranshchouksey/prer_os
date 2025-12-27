@@ -75,8 +75,10 @@ export type Database = {
         Row: {
           answer_text: string
           created_at: string
+          created_by_id: string | null
           difficulty: string | null
           id: string
+          is_system_generated: boolean
           module_id: string
           question_text: string
           tags: string[] | null
@@ -84,8 +86,10 @@ export type Database = {
         Insert: {
           answer_text: string
           created_at?: string
+          created_by_id?: string | null
           difficulty?: string | null
           id?: string
+          is_system_generated?: boolean
           module_id: string
           question_text: string
           tags?: string[] | null
@@ -93,8 +97,10 @@ export type Database = {
         Update: {
           answer_text?: string
           created_at?: string
+          created_by_id?: string | null
           difficulty?: string | null
           id?: string
+          is_system_generated?: boolean
           module_id?: string
           question_text?: string
           tags?: string[] | null

@@ -9,6 +9,8 @@ export interface Question {
   difficulty: string | null;
   tags: string[] | null;
   created_at: string;
+  created_by_id: string | null;
+  is_system_generated: boolean;
 }
 
 export interface StudyModule {
