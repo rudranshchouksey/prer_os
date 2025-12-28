@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ const navItems = [
   { path: '/study-plan', label: 'Study Plan', icon: Map },
   { path: '/tech-vault', label: 'Tech Vault', icon: Database },
   { path: '/simulator', label: 'Interview Simulator', icon: Brain },
+  { path: '/profile', label: 'Profile', icon: User },
 ];
 
 export function AppSidebar() {

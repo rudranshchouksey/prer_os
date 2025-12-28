@@ -21,8 +21,10 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
-import { useStudyModules } from '@/hooks/useStudyModules';
+import { useStudyModules, useModuleQuestions, Question } from '@/hooks/useStudyModules';
 import { Badge } from '@/components/ui/badge';
+import { VoteButtons } from '@/components/VoteButtons';
+import { MarkdownContent } from '@/components/CodeBlock';
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -71,12 +73,12 @@ function TopicCard({ topic }: { topic: Topic }) {
             className="overflow-hidden"
           >
             <div className="px-4 py-3 border-t border-border space-y-3">
-              <p className="text-sm text-muted-foreground">{topic.description}</p>
+              <MarkdownContent content={topic.description} />
               <ul className="space-y-2">
                 {topic.keyPoints.map((point, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
                     <ChevronRight className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                    <span>{point}</span>
+                    <MarkdownContent content={point} />
                   </li>
                 ))}
               </ul>
@@ -131,9 +133,82 @@ function QuestionCard({ question }: { question: InterviewQuestion }) {
             className="overflow-hidden"
           >
             <div className="px-4 py-3 border-t border-border">
-              <pre className="whitespace-pre-wrap text-sm font-mono bg-dark-900 rounded-lg p-4 overflow-x-auto">
-                {question.answer}
-              </pre>
+              <MarkdownContent content={question.answer} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// Database question card with voting
+function DbQuestionCard({ question }: { question: Question }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const difficultyColor = {
+    'Easy': 'bg-success/10 text-success',
+    'Medium': 'bg-warning/10 text-warning',
+    'Hard': 'bg-destructive/10 text-destructive'
+  };
+
+  return (
+    <motion.div
+      layout
+      className="border border-border rounded-xl overflow-hidden bg-dark-800/50"
+    >
+      <div className="flex">
+        {/* Vote buttons */}
+        <div className="flex items-center justify-center px-2 py-3 border-r border-border/50 bg-dark-900/30">
+          <VoteButtons 
+            questionId={question.id} 
+            upvotes={question.upvotes || 0}
+            downvotes={question.downvotes || 0}
+          />
+        </div>
+        
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex-1 px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors text-left"
+        >
+          <div className="flex items-center gap-3 flex-1">
+            <MessageSquare className="w-4 h-4 text-secondary flex-shrink-0" />
+            <span className="font-medium text-sm">{question.question_text}</span>
+            {!question.is_system_generated && (
+              <Badge variant="outline" className="text-xs bg-secondary/10 text-secondary border-secondary/30">
+                <Users className="w-3 h-3 mr-1" />
+                Community
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "px-2 py-0.5 rounded text-xs font-medium",
+              difficultyColor[question.difficulty as keyof typeof difficultyColor] || difficultyColor['Medium']
+            )}>
+              {question.difficulty || 'Medium'}
+            </span>
+            <motion.div
+              animate={{ rotate: isOpen ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </motion.div>
+          </div>
+        </button>
+      </div>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 py-3 border-t border-border">
+              <MarkdownContent content={question.answer_text} />
             </div>
           </motion.div>
         )}
@@ -251,6 +326,80 @@ function CategorySection({ category }: { category: Category }) {
   );
 }
 
+// Database-powered category section
+function DbCategorySection({ module, questions }: { module: { id: string; title: string; category: string; description: string | null }; questions: Question[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const Icon = Code;
+
+  // Sort questions by vote score (upvotes - downvotes)
+  const sortedQuestions = [...questions].sort((a, b) => {
+    const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
+    const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
+    return scoreB - scoreA;
+  });
+
+  return (
+    <motion.div layout className="overflow-hidden">
+      <GlassCard 
+        hover={!isExpanded}
+        className={cn(
+          "cursor-pointer",
+          isExpanded && "neon-border-purple"
+        )}
+      >
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full flex items-center justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-secondary to-secondary/50">
+              <Icon className="w-6 h-6 text-foreground" />
+            </div>
+            <div className="text-left">
+              <h3 className="text-lg font-semibold">{module.title}</h3>
+              <p className="text-sm text-muted-foreground">
+                {questions.length} community questions
+              </p>
+            </div>
+          </div>
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+          </motion.div>
+        </button>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-6 pt-6 border-t border-border">
+                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                  {sortedQuestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      No questions yet. Be the first to contribute!
+                    </p>
+                  ) : (
+                    sortedQuestions.map(question => (
+                      <DbQuestionCard key={question.id} question={question} />
+                    ))
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlassCard>
+    </motion.div>
+  );
+}
+
 export default function TechVault() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showContributeModal, setShowContributeModal] = useState(false);
@@ -266,10 +415,28 @@ export default function TechVault() {
     );
   });
 
-  // Get community questions count from DB
-  const communityQuestionsCount = studyModules?.reduce((acc, m) => {
-    return acc + (m.questions?.filter(q => !q.is_system_generated).length || 0);
-  }, 0) || 0;
+  // Get all questions from all modules
+  const allDbQuestions = studyModules?.flatMap(m => m.questions || []) || [];
+  
+  // Filter DB questions by search
+  const filteredDbQuestions = allDbQuestions.filter(q => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      q.question_text.toLowerCase().includes(query) ||
+      q.answer_text.toLowerCase().includes(query)
+    );
+  });
+
+  // Group questions by module for display
+  const moduleQuestionsMap = new Map<string, Question[]>();
+  filteredDbQuestions.forEach(q => {
+    const existing = moduleQuestionsMap.get(q.module_id) || [];
+    moduleQuestionsMap.set(q.module_id, [...existing, q]);
+  });
+
+  // Get community questions count
+  const communityQuestionsCount = allDbQuestions.filter(q => !q.is_system_generated).length;
 
   return (
     <MainLayout>
@@ -340,8 +507,9 @@ export default function TechVault() {
           })}
         </div>
 
-        {/* Categories */}
+        {/* Static Categories */}
         <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Core Curriculum</h2>
           {filteredCategories.map((category, i) => (
             <motion.div
               key={category.id}
@@ -354,7 +522,31 @@ export default function TechVault() {
           ))}
         </div>
 
-        {filteredCategories.length === 0 && (
+        {/* Database-powered Community Questions */}
+        {studyModules && studyModules.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Users className="w-5 h-5 text-secondary" />
+              Community Questions
+            </h2>
+            {studyModules.map((module, i) => {
+              const questions = moduleQuestionsMap.get(module.id) || [];
+              if (questions.length === 0 && searchQuery) return null;
+              return (
+                <motion.div
+                  key={module.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <DbCategorySection module={module} questions={questions} />
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {filteredCategories.length === 0 && filteredDbQuestions.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
           </div>

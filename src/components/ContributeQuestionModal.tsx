@@ -29,6 +29,8 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
   const [answer, setAnswer] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [difficulty, setDifficulty] = useState('Medium');
+  const [customCategory, setCustomCategory] = useState('');
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -40,21 +42,76 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
       return;
     }
 
-    if (!question.trim() || !answer.trim() || !moduleId) {
-      toast.error('Please fill in all required fields');
+    if (!question.trim() || !answer.trim()) {
+      toast.error('Please fill in question and answer');
+      return;
+    }
+
+    if (!useCustomCategory && !moduleId) {
+      toast.error('Please select a category or create a new one');
+      return;
+    }
+
+    if (useCustomCategory && !customCategory.trim()) {
+      toast.error('Please enter a category name');
       return;
     }
 
     setLoading(true);
 
     try {
+      let targetModuleId = moduleId;
+
+      // If using custom category, create new study module first
+      if (useCustomCategory && customCategory.trim()) {
+        const slug = customCategory.trim().toLowerCase().replace(/\s+/g, '-');
+        
+        // Check if module already exists
+        const { data: existingModule } = await supabase
+          .from('study_modules')
+          .select('id')
+          .eq('slug', slug)
+          .maybeSingle();
+
+        if (existingModule) {
+          targetModuleId = existingModule.id;
+        } else {
+          // Create new module - note: this might fail if user doesn't have INSERT permission
+          // In that case, we'll use an existing module as fallback
+          const { data: newModule, error: moduleError } = await supabase
+            .from('study_modules')
+            .insert({
+              title: customCategory.trim(),
+              slug,
+              category: 'Community',
+              description: `Community-created category: ${customCategory.trim()}`,
+              icon: 'Code'
+            })
+            .select('id')
+            .single();
+
+          if (moduleError) {
+            // Use first available module as fallback
+            if (modules.length > 0) {
+              targetModuleId = modules[0].id;
+              toast.info(`Using "${modules[0].title}" as category (custom categories require admin approval)`);
+            } else {
+              throw new Error('No categories available');
+            }
+          } else {
+            targetModuleId = newModule.id;
+          }
+        }
+      }
+
       const { error } = await supabase.from('questions').insert({
         question_text: question.trim(),
         answer_text: answer.trim(),
-        module_id: moduleId,
+        module_id: targetModuleId,
         difficulty,
         created_by_id: user.id,
         is_system_generated: false,
+        tags: useCustomCategory ? [customCategory.trim()] : null
       });
 
       if (error) throw error;
@@ -68,6 +125,8 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
       setAnswer('');
       setModuleId('');
       setDifficulty('Medium');
+      setCustomCategory('');
+      setUseCustomCategory(false);
       onClose();
     } catch (error: any) {
       toast.error(error.message || 'Failed to submit question');
@@ -94,7 +153,7 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto"
           >
             <div className="glass-strong rounded-2xl p-6 border border-border">
               {/* Header */}
@@ -115,20 +174,49 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Category Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="module">Category *</Label>
-                  <Select value={moduleId} onValueChange={setModuleId}>
-                    <SelectTrigger className="bg-muted/50 border-border">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {modules.map((module) => (
-                        <SelectItem key={module.id} value={module.id}>
-                          {module.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Category *</Label>
+                  <div className="flex gap-2 mb-2">
+                    <Button
+                      type="button"
+                      variant={!useCustomCategory ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUseCustomCategory(false)}
+                    >
+                      Existing
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={useCustomCategory ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUseCustomCategory(true)}
+                    >
+                      New Category
+                    </Button>
+                  </div>
+                  
+                  {useCustomCategory ? (
+                    <Input
+                      placeholder="Enter new category name (e.g., Web3, Rust, GraphQL)"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      className="bg-muted/50 border-border"
+                    />
+                  ) : (
+                    <Select value={moduleId} onValueChange={setModuleId}>
+                      <SelectTrigger className="bg-muted/50 border-border">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {modules.map((module) => (
+                          <SelectItem key={module.id} value={module.id}>
+                            {module.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -157,13 +245,13 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="answer">Answer *</Label>
+                  <Label htmlFor="answer">Answer * (Supports code blocks with ```)</Label>
                   <Textarea
                     id="answer"
-                    placeholder="Provide a comprehensive answer..."
+                    placeholder={"Provide a comprehensive answer...\n\nYou can use code blocks:\n```javascript\nconst example = 'hello';\n```"}
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
-                    className="bg-muted/50 border-border min-h-[120px]"
+                    className="bg-muted/50 border-border min-h-[150px] font-mono text-sm"
                   />
                 </div>
 

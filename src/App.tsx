@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import StudyPlan from "./pages/StudyPlan";
 import TechVault from "./pages/TechVault";
 import InterviewSimulator from "./pages/InterviewSimulator";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
             <Route path="/tech-vault" element={<ProtectedRoute><TechVault /></ProtectedRoute>} />
             <Route path="/simulator" element={<ProtectedRoute><InterviewSimulator /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

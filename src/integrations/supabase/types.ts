@@ -71,39 +71,77 @@ export type Database = {
         }
         Relationships: []
       }
+      question_votes: {
+        Row: {
+          created_at: string
+          id: string
+          question_id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          question_id: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          question_id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_votes_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       questions: {
         Row: {
           answer_text: string
           created_at: string
           created_by_id: string | null
           difficulty: string | null
+          downvotes: number | null
           id: string
           is_system_generated: boolean
           module_id: string
           question_text: string
           tags: string[] | null
+          upvotes: number | null
         }
         Insert: {
           answer_text: string
           created_at?: string
           created_by_id?: string | null
           difficulty?: string | null
+          downvotes?: number | null
           id?: string
           is_system_generated?: boolean
           module_id: string
           question_text: string
           tags?: string[] | null
+          upvotes?: number | null
         }
         Update: {
           answer_text?: string
           created_at?: string
           created_by_id?: string | null
           difficulty?: string | null
+          downvotes?: number | null
           id?: string
           is_system_generated?: boolean
           module_id?: string
           question_text?: string
           tags?: string[] | null
+          upvotes?: number | null
         }
         Relationships: [
           {
