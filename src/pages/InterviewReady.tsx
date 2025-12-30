@@ -133,8 +133,8 @@ export default function InterviewReady() {
   // Get all questions from all modules
   const allQuestions = studyModules?.flatMap(m => m.questions || []) || [];
   
-  // Get unique categories
-  const categories = studyModules?.map(m => ({ id: m.id, title: m.title })) || [];
+  // Get unique categories with full module info
+  const categories = studyModules?.map(m => ({ id: m.id, title: m.title, category: m.category })) || [];
   
   // Filter and sort questions
   const filteredQuestions = allQuestions
