@@ -2,12 +2,12 @@ import { motion } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Map, 
-  Database, 
-  Brain, 
+  Calendar, 
+  BookOpen, 
+  MessageSquareText,
   ChevronLeft,
   ChevronRight,
-  Zap,
+  Sparkles,
   LogOut,
   User
 } from 'lucide-react';
@@ -19,9 +19,9 @@ import { toast } from 'sonner';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/study-plan', label: 'Study Plan', icon: Map },
-  { path: '/tech-vault', label: 'Tech Vault', icon: Database },
-  { path: '/simulator', label: 'Interview Simulator', icon: Brain },
+  { path: '/study-plan', label: 'Study Plan', icon: Calendar },
+  { path: '/notes', label: 'Study Notes', icon: BookOpen },
+  { path: '/questions', label: 'Interview Ready', icon: MessageSquareText },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -47,7 +47,7 @@ export function AppSidebar() {
       animate={{ x: 0, opacity: 1 }}
       className={cn(
         "fixed left-0 top-0 h-screen z-50 flex flex-col",
-        "bg-sidebar border-r border-sidebar-border",
+        "glass-sidebar",
         "transition-all duration-300 ease-in-out",
         collapsed ? "w-20" : "w-64"
       )}
@@ -55,10 +55,9 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 p-6 border-b border-sidebar-border">
         <div className="relative flex-shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-glow-blue">
-            <Zap className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-soft">
+            <Sparkles className="w-5 h-5 text-primary-foreground" />
           </div>
-          <div className="absolute -inset-1 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl blur-lg -z-10" />
         </div>
         {!collapsed && (
           <motion.div
@@ -66,7 +65,7 @@ export function AppSidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <h1 className="text-xl font-bold gradient-text">PrepOS</h1>
+            <h1 className="text-xl font-serif font-bold text-foreground">PrepOS</h1>
             <p className="text-xs text-muted-foreground">Interview Prep</p>
           </motion.div>
         )}
@@ -86,7 +85,7 @@ export function AppSidebar() {
                   "group relative overflow-hidden",
                   isActive
                     ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
                 )}
               >
                 {isActive && (
@@ -102,10 +101,7 @@ export function AppSidebar() {
                   isActive && "text-primary"
                 )} />
                 {!collapsed && (
-                  <span className="font-medium">{item.label}</span>
-                )}
-                {isActive && !collapsed && (
-                  <div className="ml-auto w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="font-medium text-sm">{item.label}</span>
                 )}
               </motion.div>
             </Link>
@@ -115,32 +111,42 @@ export function AppSidebar() {
 
       {/* User section with Logout */}
       <div className="p-4 border-t border-sidebar-border space-y-2">
+        {user && !collapsed && (
+          <div className="flex items-center gap-3 px-2 mb-3">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-primary-foreground text-sm font-medium">
+              {user.email?.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-sm text-muted-foreground truncate">
+              {user.email}
+            </span>
+          </div>
+        )}
         {user && (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleLogout}
             className={cn(
-              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
+              "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10",
               collapsed && "justify-center"
             )}
           >
             <LogOut className="w-4 h-4" />
-            {!collapsed && <span className="ml-2">Logout</span>}
+            {!collapsed && <span className="ml-2">Log out</span>}
           </Button>
         )}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full justify-center"
+          className="w-full justify-center text-muted-foreground"
         >
           {collapsed ? (
             <ChevronRight className="w-4 h-4" />
           ) : (
             <>
               <ChevronLeft className="w-4 h-4" />
-              <span>Collapse</span>
+              <span className="ml-1 text-xs">Collapse</span>
             </>
           )}
         </Button>
