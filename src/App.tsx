@@ -9,8 +9,8 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import StudyPlan from "./pages/StudyPlan";
-import TechVault from "./pages/TechVault";
-import InterviewSimulator from "./pages/InterviewSimulator";
+import StudyNotes from "./pages/StudyNotes";
+import InterviewReady from "./pages/InterviewReady";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -28,8 +28,8 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
-            <Route path="/tech-vault" element={<ProtectedRoute><TechVault /></ProtectedRoute>} />
-            <Route path="/simulator" element={<ProtectedRoute><InterviewSimulator /></ProtectedRoute>} />
+            <Route path="/notes" element={<ProtectedRoute><StudyNotes /></ProtectedRoute>} />
+            <Route path="/questions" element={<ProtectedRoute><InterviewReady /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
