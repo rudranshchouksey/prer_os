@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import StudyPlan from "./pages/StudyPlan";
 import StudyNotes from "./pages/StudyNotes";
 import InterviewReady from "./pages/InterviewReady";
+import Docs from "./pages/Docs";
 import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
+            <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
             <Route path="/notes" element={<ProtectedRoute><StudyNotes /></ProtectedRoute>} />
             <Route path="/questions" element={<ProtectedRoute><InterviewReady /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
