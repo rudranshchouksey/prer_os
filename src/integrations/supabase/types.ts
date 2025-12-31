@@ -271,8 +271,10 @@ export type Database = {
           created_at: string
           daily_streak: number | null
           id: string
+          interested_categories: string[] | null
           interview_date: string | null
           last_activity_date: string | null
+          onboarding_completed: boolean | null
           updated_at: string
           user_id: string
         }
@@ -280,8 +282,10 @@ export type Database = {
           created_at?: string
           daily_streak?: number | null
           id?: string
+          interested_categories?: string[] | null
           interview_date?: string | null
           last_activity_date?: string | null
+          onboarding_completed?: boolean | null
           updated_at?: string
           user_id: string
         }
@@ -289,8 +293,10 @@ export type Database = {
           created_at?: string
           daily_streak?: number | null
           id?: string
+          interested_categories?: string[] | null
           interview_date?: string | null
           last_activity_date?: string | null
+          onboarding_completed?: boolean | null
           updated_at?: string
           user_id?: string
         }

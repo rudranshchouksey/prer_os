@@ -131,7 +131,8 @@
   }
 
   .glass-sidebar {
-    @apply bg-sidebar-background/80 backdrop-blur-2xl border-r border-sidebar-border;
+    background-color: hsl(var(--sidebar-background) / 0.8);
+    @apply backdrop-blur-2xl border-r border-sidebar-border;
   }
 
   /* Soft card styling */

@@ -8,6 +8,8 @@ export interface UserSettings {
   interview_date: string | null;
   daily_streak: number;
   last_activity_date: string | null;
+  interested_categories: string[] | null;
+  onboarding_completed: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -51,7 +53,7 @@ export function useUpdateSettings() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (updates: Partial<Pick<UserSettings, 'interview_date' | 'daily_streak' | 'last_activity_date'>>) => {
+    mutationFn: async (updates: Partial<Pick<UserSettings, 'interview_date' | 'daily_streak' | 'last_activity_date' | 'interested_categories' | 'onboarding_completed'>>) => {
       if (!user) throw new Error('User not authenticated');
 
       const { error } = await supabase

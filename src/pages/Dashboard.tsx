@@ -1,18 +1,17 @@
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { 
   Calendar, 
   Target, 
   BookOpen, 
   Brain, 
   TrendingUp,
-  ChevronRight,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Settings
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { GlassCard } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { AnimatedProgress } from '@/components/ui/animated-progress';
 import { CountdownTimer } from '@/components/ui/countdown-timer';
@@ -22,6 +21,7 @@ import { techVaultData } from '@/data/techVaultData';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { useUserSettings, useTrackActivity } from '@/hooks/useUserSettings';
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -47,7 +47,14 @@ export default function Dashboard() {
     incrementStreak
   } = useStore();
 
+  const { data: settings } = useUserSettings();
+  const { trackActivity } = useTrackActivity();
   const [showDateInput, setShowDateInput] = useState(false);
+
+  // Track activity on load
+  useEffect(() => {
+    trackActivity();
+  }, []);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -81,6 +88,8 @@ export default function Dashboard() {
     }
   };
 
+  const userInterests = settings?.interested_categories || [];
+
   return (
     <MainLayout>
       <motion.div
@@ -92,26 +101,46 @@ export default function Dashboard() {
         {/* Header */}
         <motion.div variants={itemVariants} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold mb-2">
-              <span className="gradient-text">War Room</span>
+            <h1 className="text-3xl lg:text-4xl font-serif font-bold mb-2">
+              <span className="gradient-text">Dashboard</span>
             </h1>
             <p className="text-muted-foreground">
               Your command center for interview preparation
             </p>
           </div>
-          <StreakCounter streak={dailyStreak} />
+          <div className="flex items-center gap-3">
+            <Link to="/profile">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings className="w-4 h-4" />
+                Edit Preferences
+              </Button>
+            </Link>
+            <StreakCounter streak={settings?.daily_streak || dailyStreak} />
+          </div>
         </motion.div>
+
+        {/* User Interests Badge */}
+        {userInterests.length > 0 && (
+          <motion.div variants={itemVariants} className="flex flex-wrap gap-2">
+            <span className="text-sm text-muted-foreground">Your tracks:</span>
+            {userInterests.map(interest => (
+              <span key={interest} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium capitalize">
+                {interest.replace('-', ' ')}
+              </span>
+            ))}
+          </motion.div>
+        )}
 
         {/* Countdown Timer */}
         <motion.div variants={itemVariants}>
-          <GlassCard glow="blue" className="relative overflow-hidden">
+          <div className="soft-card p-6 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5" />
             <div className="relative z-10">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar className="w-5 h-5 text-primary" />
-                    <h2 className="text-lg font-semibold">Interview Countdown</h2>
+                    <h2 className="text-lg font-serif font-semibold text-foreground">Interview Countdown</h2>
                   </div>
                   {interviewDate ? (
                     <p className="text-sm text-muted-foreground">
@@ -145,7 +174,6 @@ export default function Dashboard() {
                         type="date" 
                         name="interviewDate"
                         defaultValue={interviewDate || ''}
-                        className="bg-dark-800 border-border"
                       />
                       <Button type="submit" size="sm">Save</Button>
                     </form>
@@ -153,49 +181,49 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          </GlassCard>
+          </div>
         </motion.div>
 
         {/* Stats Grid */}
         <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <GlassCard className="text-center">
+          <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
               <Brain className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-3xl font-bold font-mono gradient-text">{totalQuestionsAnswered}</p>
+            <p className="text-3xl font-serif font-bold text-foreground">{totalQuestionsAnswered}</p>
             <p className="text-sm text-muted-foreground">Questions Answered</p>
-          </GlassCard>
+          </div>
 
-          <GlassCard className="text-center">
+          <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mx-auto mb-3">
-              <Target className="w-6 h-6 text-secondary" />
+              <Target className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-3xl font-bold font-mono neon-text-purple">{stats.highConfidence}</p>
+            <p className="text-3xl font-serif font-bold text-foreground">{stats.highConfidence}</p>
             <p className="text-sm text-muted-foreground">High Confidence</p>
-          </GlassCard>
+          </div>
 
-          <GlassCard className="text-center">
+          <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center mx-auto mb-3">
               <BookOpen className="w-6 h-6 text-success" />
             </div>
-            <p className="text-3xl font-bold font-mono text-success">{stats.completedItems}</p>
+            <p className="text-3xl font-serif font-bold text-success">{stats.completedItems}</p>
             <p className="text-sm text-muted-foreground">Topics Applied</p>
-          </GlassCard>
+          </div>
 
-          <GlassCard className="text-center">
+          <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center mx-auto mb-3">
               <TrendingUp className="w-6 h-6 text-warning" />
             </div>
-            <p className="text-3xl font-bold font-mono text-warning">{stats.mustDoItems}</p>
+            <p className="text-3xl font-serif font-bold text-warning">{stats.mustDoItems}</p>
             <p className="text-sm text-muted-foreground">Must-Do Items</p>
-          </GlassCard>
+          </div>
         </motion.div>
 
         {/* Progress Section */}
         <motion.div variants={itemVariants}>
-          <GlassCard>
+          <div className="soft-card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Overall Progress</h2>
+              <h2 className="text-lg font-serif font-semibold text-foreground">Overall Progress</h2>
               <span className="text-sm text-muted-foreground">
                 {stats.reviewedQuestions} of {stats.totalQuestions} questions reviewed
               </span>
@@ -206,13 +234,13 @@ export default function Dashboard() {
               size="lg"
               color="blue"
             />
-          </GlassCard>
+          </div>
         </motion.div>
 
         {/* Category Progress */}
         <motion.div variants={itemVariants}>
-          <GlassCard>
-            <h2 className="text-lg font-semibold mb-6">Category Breakdown</h2>
+          <div className="soft-card p-6">
+            <h2 className="text-lg font-serif font-semibold text-foreground mb-6">Category Breakdown</h2>
             <div className="space-y-4">
               {techVaultData.map(category => {
                 const reviewed = category.questions.filter(q => flashcardProgress[q.id]).length;
@@ -230,51 +258,51 @@ export default function Dashboard() {
                 );
               })}
             </div>
-          </GlassCard>
+          </div>
         </motion.div>
 
         {/* Quick Actions */}
         <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Link to="/simulator">
-            <GlassCard className="group cursor-pointer h-full">
+          <Link to="/questions">
+            <div className="soft-card-hover p-6 group cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Zap className="w-6 h-6 text-primary-foreground" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Start Practice Session</h3>
-                    <p className="text-sm text-muted-foreground">Random flashcards from all categories</p>
+                    <h3 className="font-serif font-semibold text-foreground">Interview Ready</h3>
+                    <p className="text-sm text-muted-foreground">Practice questions from all categories</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
               </div>
-            </GlassCard>
+            </div>
           </Link>
 
-          <Link to="/tech-vault">
-            <GlassCard className="group cursor-pointer h-full">
+          <Link to="/notes">
+            <div className="soft-card-hover p-6 group cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary to-neon-pink flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary to-accent flex items-center justify-center group-hover:scale-110 transition-transform">
                     <BookOpen className="w-6 h-6 text-secondary-foreground" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Browse Tech Vault</h3>
-                    <p className="text-sm text-muted-foreground">Study notes and interview Q&A</p>
+                    <h3 className="font-serif font-semibold text-foreground">Study Notes</h3>
+                    <p className="text-sm text-muted-foreground">Your personal knowledge base</p>
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-secondary group-hover:translate-x-1 transition-all" />
               </div>
-            </GlassCard>
+            </div>
           </Link>
         </motion.div>
 
         {/* Recent Activity */}
         {Object.keys(flashcardProgress).length > 0 && (
           <motion.div variants={itemVariants}>
-            <GlassCard>
-              <h2 className="text-lg font-semibold mb-4">Recent Reviews</h2>
+            <div className="soft-card p-6">
+              <h2 className="text-lg font-serif font-semibold text-foreground mb-4">Recent Reviews</h2>
               <div className="space-y-3">
                 {Object.values(flashcardProgress)
                   .sort((a, b) => new Date(b.lastReviewed).getTime() - new Date(a.lastReviewed).getTime())
@@ -285,7 +313,7 @@ export default function Dashboard() {
                       .find(q => q.id === progress.questionId);
                     if (!question) return null;
                     return (
-                      <div key={progress.questionId} className="flex items-center justify-between p-3 rounded-xl bg-dark-800/50">
+                      <div key={progress.questionId} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className={cn(
                             "w-2 h-2 rounded-full",
@@ -293,7 +321,7 @@ export default function Dashboard() {
                             progress.confidence === 'medium' && "bg-warning",
                             progress.confidence === 'low' && "bg-destructive"
                           )} />
-                          <p className="text-sm truncate">{question.question}</p>
+                          <p className="text-sm text-foreground truncate">{question.question}</p>
                         </div>
                         <span className="text-xs text-muted-foreground ml-4">
                           {progress.reviewCount}x
@@ -302,7 +330,7 @@ export default function Dashboard() {
                     );
                   })}
               </div>
-            </GlassCard>
+            </div>
           </motion.div>
         )}
       </motion.div>

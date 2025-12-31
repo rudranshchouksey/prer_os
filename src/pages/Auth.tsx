@@ -75,7 +75,7 @@ export default function Auth() {
           }
         } else {
           toast.success('Account created! Welcome to PrepOS.');
-          navigate('/dashboard');
+          navigate('/onboarding');
         }
       }
     } catch (err) {
