@@ -12,6 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Sheet,
   SheetContent,
@@ -19,24 +24,18 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useQueryClient } from '@tanstack/react-query';
-import { useIsMobile } from '@/hooks/use-mobile';
 
-interface ContributeQuestionModalProps {
+interface ContributeNoteModalProps {
   isOpen: boolean;
   onClose: () => void;
-  modules: Array<{ id: string; title: string; category: string }>;
+  categories: Array<{ id: string; name: string }>;
 }
 
-export function ContributeQuestionModal({ isOpen, onClose, modules }: ContributeQuestionModalProps) {
+export function ContributeNoteModal({ isOpen, onClose, categories }: ContributeNoteModalProps) {
   const [loading, setLoading] = useState(false);
-  const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [moduleId, setModuleId] = useState('');
-  const [difficulty, setDifficulty] = useState('Medium');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [customCategory, setCustomCategory] = useState('');
   const [useCustomCategory, setUseCustomCategory] = useState(false);
   const { user } = useAuth();
@@ -51,94 +50,41 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
       return;
     }
 
-    if (!question.trim() || !answer.trim()) {
-      toast.error('Please fill in question and answer');
-      return;
-    }
-
-    if (!useCustomCategory && !moduleId) {
-      toast.error('Please select a category or create a new one');
-      return;
-    }
-
-    if (useCustomCategory && !customCategory.trim()) {
-      toast.error('Please enter a category name');
+    if (!title.trim() || !content.trim()) {
+      toast.error('Please fill in title and content');
       return;
     }
 
     setLoading(true);
 
     try {
-      let targetModuleId = moduleId;
+      const tags = useCustomCategory && customCategory.trim() 
+        ? [customCategory.trim()] 
+        : categoryId 
+          ? [categoryId] 
+          : [];
 
-      // If using custom category, create new study module first
-      if (useCustomCategory && customCategory.trim()) {
-        const slug = customCategory.trim().toLowerCase().replace(/\s+/g, '-');
-        
-        // Check if module already exists
-        const { data: existingModule } = await supabase
-          .from('study_modules')
-          .select('id')
-          .eq('slug', slug)
-          .maybeSingle();
-
-        if (existingModule) {
-          targetModuleId = existingModule.id;
-        } else {
-          // Create new module - note: this might fail if user doesn't have INSERT permission
-          // In that case, we'll use an existing module as fallback
-          const { data: newModule, error: moduleError } = await supabase
-            .from('study_modules')
-            .insert({
-              title: customCategory.trim(),
-              slug,
-              category: 'Community',
-              description: `Community-created category: ${customCategory.trim()}`,
-              icon: 'Code'
-            })
-            .select('id')
-            .single();
-
-          if (moduleError) {
-            // Use first available module as fallback
-            if (modules.length > 0) {
-              targetModuleId = modules[0].id;
-              toast.info(`Using "${modules[0].title}" as category (custom categories require admin approval)`);
-            } else {
-              throw new Error('No categories available');
-            }
-          } else {
-            targetModuleId = newModule.id;
-          }
-        }
-      }
-
-      const { error } = await supabase.from('questions').insert({
-        question_text: question.trim(),
-        answer_text: answer.trim(),
-        module_id: targetModuleId,
-        difficulty,
-        created_by_id: user.id,
-        is_system_generated: false,
-        tags: useCustomCategory ? [customCategory.trim()] : null
+      const { error } = await supabase.from('notes').insert({
+        title: title.trim(),
+        content: content.trim(),
+        user_id: user.id,
+        tags
       });
 
       if (error) throw error;
 
-      toast.success('Question submitted! Thanks for contributing.');
-      queryClient.invalidateQueries({ queryKey: ['questions'] });
-      queryClient.invalidateQueries({ queryKey: ['study-modules'] });
+      toast.success('Note added successfully!');
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
       
       // Reset form
-      setQuestion('');
-      setAnswer('');
-      setModuleId('');
-      setDifficulty('Medium');
+      setTitle('');
+      setContent('');
+      setCategoryId('');
       setCustomCategory('');
       setUseCustomCategory(false);
       onClose();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to submit question');
+      toast.error(error.message || 'Failed to add note');
     } finally {
       setLoading(false);
     }
@@ -148,7 +94,7 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Category Selection */}
       <div className="space-y-2">
-        <Label>Category *</Label>
+        <Label>Category</Label>
         <div className="flex gap-2 mb-2">
           <Button
             type="button"
@@ -170,20 +116,20 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
         
         {useCustomCategory ? (
           <Input
-            placeholder="Enter new category name (e.g., Web3, Rust, GraphQL)"
+            placeholder="Enter new category name"
             value={customCategory}
             onChange={(e) => setCustomCategory(e.target.value)}
             className="bg-muted/50 border-border"
           />
         ) : (
-          <Select value={moduleId} onValueChange={setModuleId}>
+          <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger className="bg-muted/50 border-border">
               <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent>
-              {modules.map((module) => (
-                <SelectItem key={module.id} value={module.id}>
-                  {module.title}
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -192,38 +138,24 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="difficulty">Difficulty</Label>
-        <Select value={difficulty} onValueChange={setDifficulty}>
-          <SelectTrigger className="bg-muted/50 border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Easy">Easy</SelectItem>
-            <SelectItem value="Medium">Medium</SelectItem>
-            <SelectItem value="Hard">Hard</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="question">Question *</Label>
-        <Textarea
-          id="question"
-          placeholder="Enter the interview question..."
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          className="bg-muted/50 border-border min-h-[80px]"
+        <Label htmlFor="title">Title *</Label>
+        <Input
+          id="title"
+          placeholder="Enter note title..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="bg-muted/50 border-border"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="answer">Answer * (Supports code blocks with ```)</Label>
+        <Label htmlFor="content">Content * (Supports code blocks with ```)</Label>
         <Textarea
-          id="answer"
-          placeholder={"Provide a comprehensive answer...\n\nYou can use code blocks:\n```javascript\nconst example = 'hello';\n```"}
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          className="bg-muted/50 border-border min-h-[150px] font-mono text-sm"
+          id="content"
+          placeholder={"Write your documentation...\n\nYou can use code blocks:\n```javascript\nconst example = 'hello';\n```"}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="bg-muted/50 border-border min-h-[200px] font-mono text-sm"
         />
       </div>
 
@@ -244,14 +176,14 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            'Submit Question'
+            'Add Note'
           )}
         </Button>
       </div>
     </form>
   );
 
-  // Mobile: Use Sheet (Drawer from bottom)
+  // Mobile: Use Sheet (Drawer)
   if (isMobile) {
     return (
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -262,8 +194,8 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
                 <Plus className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <SheetTitle>Contribute Question</SheetTitle>
-                <SheetDescription>Share your knowledge with the community</SheetDescription>
+                <SheetTitle>Add Documentation</SheetTitle>
+                <SheetDescription>Contribute to the knowledge base</SheetDescription>
               </div>
             </div>
           </SheetHeader>
@@ -275,7 +207,7 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
     );
   }
 
-  // Desktop: Use centered Modal with proper flexbox centering
+  // Desktop: Use Modal
   return (
     <AnimatePresence>
       {isOpen && (
@@ -289,7 +221,7 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
             onClick={onClose}
           />
           
-          {/* Modal Container - Proper centering with flexbox */}
+          {/* Modal - Centered with flexbox */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -306,8 +238,8 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
                       <Plus className="w-5 h-5 text-primary-foreground" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-foreground">Contribute Question</h2>
-                      <p className="text-sm text-muted-foreground">Share your knowledge with the community</p>
+                      <h2 className="text-lg font-semibold text-foreground">Add Documentation</h2>
+                      <p className="text-sm text-muted-foreground">Contribute to the knowledge base</p>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={onClose}>

@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
-  User
+  User,
+  FileText
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ import { toast } from 'sonner';
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/study-plan', label: 'Study Plan', icon: Calendar },
+  { path: '/docs', label: 'Docs', icon: FileText },
   { path: '/notes', label: 'Study Notes', icon: BookOpen },
   { path: '/questions', label: 'Interview Ready', icon: MessageSquareText },
   { path: '/profile', label: 'Profile', icon: User },

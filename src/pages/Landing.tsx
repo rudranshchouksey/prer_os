@@ -6,14 +6,17 @@ import {
   Brain, 
   Target, 
   BookOpen, 
-  CheckCircle2, 
   ArrowRight,
   Github,
   Layers,
   Cloud,
   Code,
   Palette,
-  Shield
+  Shield,
+  FileText,
+  Users,
+  TrendingUp,
+  CheckCircle
 } from 'lucide-react';
 
 const features = [
@@ -24,62 +27,68 @@ const features = [
   },
   {
     icon: BookOpen,
-    title: 'Tech Vault',
-    description: 'Comprehensive curriculum covering architecture, cloud, and full-stack topics'
+    title: 'Tech Documentation',
+    description: 'Comprehensive docs covering architecture, cloud, and full-stack topics'
   },
   {
     icon: Target,
-    title: 'Mock Mode',
-    description: 'Flashcard-based interview simulator with confidence tracking'
+    title: 'Interview Q&A',
+    description: 'Community-driven question bank with voting and detailed answers'
   },
   {
-    icon: Zap,
+    icon: TrendingUp,
     title: 'Progress Analytics',
     description: 'Visual dashboard tracking your mastery across all domains'
   }
 ];
 
 const categories = [
-  { icon: Layers, name: 'Architecture', color: 'text-primary' },
-  { icon: Cloud, name: 'Cloud & DevOps', color: 'text-secondary' },
-  { icon: Code, name: 'Full Stack', color: 'text-primary' },
-  { icon: Palette, name: 'Frontend', color: 'text-secondary' },
-  { icon: Shield, name: 'Security', color: 'text-primary' },
+  { icon: Layers, name: 'Architecture' },
+  { icon: Cloud, name: 'Cloud & DevOps' },
+  { icon: Code, name: 'Full Stack' },
+  { icon: Palette, name: 'Frontend' },
+  { icon: Shield, name: 'Security' },
 ];
 
 const companies = ['Google', 'Meta', 'Amazon', 'Microsoft', 'Stripe', 'Netflix'];
+
+const stats = [
+  { label: 'Questions', value: '500+' },
+  { label: 'Topics', value: '50+' },
+  { label: 'Engineers', value: '10K+' },
+];
 
 export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center cyber-grid">
-        {/* Background effects */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        </div>
-
-        {/* Navigation */}
-        <nav className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-20">
+    <div className="min-h-screen bg-gradient-to-br from-white via-purple-50/30 to-blue-50/30 overflow-hidden">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-xl border-b border-border/50">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2"
+            className="flex items-center gap-3"
           >
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-soft">
               <Zap className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold">PrepOS</span>
+            <span className="text-xl font-serif font-bold text-foreground">PrepOS</span>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-4"
+            className="flex items-center gap-6"
           >
+            <button 
+              onClick={() => navigate('/docs')}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
+            >
+              <FileText className="w-4 h-4 inline mr-1.5" />
+              Docs
+            </button>
             <Button 
               variant="ghost" 
               onClick={() => navigate('/auth')}
@@ -89,81 +98,113 @@ export default function Landing() {
             </Button>
             <Button 
               onClick={() => navigate('/auth')}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 shadow-soft"
             >
               Get Started
             </Button>
           </motion.div>
-        </nav>
+        </div>
+      </nav>
 
-        {/* Hero Content */}
-        <div className="container mx-auto px-6 text-center relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/30 bg-primary/5 text-sm text-primary mb-8">
-              <Zap className="w-4 h-4" />
-              Engineered for Senior Developers
-            </div>
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 min-h-screen flex items-center">
+        {/* Background decorations */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/5 to-purple-300/5 rounded-full blur-3xl" />
+        </div>
 
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Crack the{' '}
-              <span className="gradient-text">Senior Developer</span>
-              <br />
-              Interview
-            </h1>
-
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              Master system design, cloud architecture, and full-stack fundamentals 
-              with our comprehensive interview preparation platform.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button 
-                size="lg" 
-                onClick={() => navigate('/auth')}
-                className="bg-primary hover:bg-primary/90 text-lg px-8 py-6 neon-border-blue"
-              >
-                Start Preparing for Free
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline"
-                className="text-lg px-8 py-6 border-border hover:bg-muted"
-              >
-                <Github className="w-5 h-5 mr-2" />
-                View on GitHub
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* Category Pills */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex flex-wrap justify-center gap-3 mt-16"
-          >
-            {categories.map((cat, i) => (
-              <div
-                key={cat.name}
-                className="flex items-center gap-2 px-4 py-2 rounded-full glass border border-border/50"
-              >
-                <cat.icon className={`w-4 h-4 ${cat.color}`} />
-                <span className="text-sm">{cat.name}</span>
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="max-w-4xl mx-auto text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-border shadow-soft text-sm text-muted-foreground mb-8">
+                <Zap className="w-4 h-4 text-primary" />
+                Engineered for Senior Developers
               </div>
-            ))}
-          </motion.div>
+
+              {/* Title */}
+              <h1 className="text-5xl md:text-7xl font-serif font-bold mb-6 leading-tight text-foreground">
+                Crack the{' '}
+                <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                  Senior Developer
+                </span>
+                <br />
+                Interview
+              </h1>
+
+              {/* Subtitle */}
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+                Master system design, cloud architecture, and full-stack fundamentals 
+                with our comprehensive interview preparation platform.
+              </p>
+
+              {/* CTA Buttons */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Button 
+                  size="lg" 
+                  onClick={() => navigate('/auth')}
+                  className="bg-primary hover:bg-primary/90 text-lg px-8 py-6 shadow-soft-lg hover:shadow-soft-xl transition-all"
+                >
+                  Start Preparing for Free
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="text-lg px-8 py-6 bg-white/50 border-border hover:bg-white shadow-soft"
+                >
+                  <Github className="w-5 h-5 mr-2" />
+                  View on GitHub
+                </Button>
+              </div>
+            </motion.div>
+
+            {/* Category Pills */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-wrap justify-center gap-3 mt-14"
+            >
+              {categories.map((cat) => (
+                <div
+                  key={cat.name}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-border shadow-soft text-sm font-medium text-foreground"
+                >
+                  <cat.icon className="w-4 h-4 text-primary" />
+                  <span>{cat.name}</span>
+                </div>
+              ))}
+            </motion.div>
+
+            {/* Stats */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex justify-center gap-12 mt-16"
+            >
+              {stats.map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
+            </motion.div>
+          </div>
         </div>
 
         {/* Scroll indicator */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
+          transition={{ delay: 0.8 }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2"
         >
           <div className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex items-start justify-center p-2">
@@ -185,8 +226,11 @@ export default function Landing() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold mb-4">
-              Everything You Need to <span className="gradient-text">Succeed</span>
+            <h2 className="text-4xl font-serif font-bold mb-4 text-foreground">
+              Everything You Need to{' '}
+              <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                Succeed
+              </span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               A complete toolkit designed specifically for senior engineering interviews
@@ -201,13 +245,13 @@ export default function Landing() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="glass rounded-2xl p-6 hover-lift group"
+                className="bg-white rounded-2xl p-6 shadow-soft-lg border border-border/50 hover:shadow-soft-xl hover:-translate-y-1 transition-all duration-300 group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-purple-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm">{feature.description}</p>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">{feature.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
               </motion.div>
             ))}
           </div>
@@ -215,7 +259,7 @@ export default function Landing() {
       </section>
 
       {/* Curriculum Preview */}
-      <section className="py-24 bg-muted/30">
+      <section className="py-24 bg-white/50">
         <div className="container mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -223,8 +267,11 @@ export default function Landing() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl font-bold mb-4">
-              Curated <span className="gradient-text">Curriculum</span>
+            <h2 className="text-4xl font-serif font-bold mb-4 text-foreground">
+              Curated{' '}
+              <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+                Curriculum
+              </span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Real interview questions from top tech companies, with detailed explanations
@@ -246,15 +293,17 @@ export default function Landing() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="glass rounded-xl p-6 hover-glow"
+                className="bg-white rounded-2xl p-6 shadow-soft border border-border/50 hover:shadow-soft-lg transition-all"
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs px-2 py-1 rounded bg-primary/20 text-primary">{item.category}</span>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    item.difficulty === 'Hard' ? 'bg-destructive/20 text-destructive' : 'bg-warning/20 text-warning'
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">{item.category}</span>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                    item.difficulty === 'Hard' 
+                      ? 'bg-red-100 text-red-600' 
+                      : 'bg-amber-100 text-amber-600'
                   }`}>{item.difficulty}</span>
                 </div>
-                <p className="font-medium">{item.q}</p>
+                <p className="font-medium text-foreground">{item.q}</p>
               </motion.div>
             ))}
           </div>
@@ -269,16 +318,19 @@ export default function Landing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <p className="text-muted-foreground mb-8">Trusted by engineers at</p>
+            <p className="text-muted-foreground mb-8 flex items-center justify-center gap-2">
+              <Users className="w-4 h-4" />
+              Trusted by engineers at
+            </p>
             <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
               {companies.map((company, i) => (
                 <motion.span
                   key={company}
                   initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 0.5 }}
+                  whileInView={{ opacity: 1 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="text-2xl font-bold text-muted-foreground/50"
+                  className="text-2xl font-bold text-muted-foreground/40"
                 >
                   {company}
                 </motion.span>
@@ -290,23 +342,27 @@ export default function Landing() {
 
       {/* CTA Section */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 gradient-cyber opacity-50" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-50 to-blue-50" />
         <div className="container mx-auto px-6 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="bg-white rounded-3xl p-12 shadow-soft-xl border border-border/50 max-w-3xl mx-auto"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center mx-auto mb-6 shadow-soft">
+              <CheckCircle className="w-8 h-8 text-primary-foreground" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-serif font-bold mb-4 text-foreground">
               Ready to Ace Your Interview?
             </h2>
-            <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
               Join thousands of engineers who landed their dream jobs with PrepOS
             </p>
             <Button 
               size="lg" 
               onClick={() => navigate('/auth')}
-              className="bg-primary hover:bg-primary/90 text-lg px-10 py-6"
+              className="bg-primary hover:bg-primary/90 text-lg px-10 py-6 shadow-soft-lg"
             >
               Start Free Trial
               <ArrowRight className="w-5 h-5 ml-2" />
@@ -316,18 +372,21 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-border">
+      <footer className="py-8 bg-white border-t border-border">
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-soft">
                 <Zap className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">PrepOS</span>
+              <span className="font-serif font-semibold text-foreground">PrepOS</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              © 2024 PrepOS. Built for engineers, by engineers.
-            </p>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <button onClick={() => navigate('/docs')} className="hover:text-foreground transition-colors">
+                Docs
+              </button>
+              <span>© 2024 PrepOS. Built for engineers, by engineers.</span>
+            </div>
           </div>
         </div>
       </footer>
