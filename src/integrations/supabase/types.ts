@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      job_applications: {
+        Row: {
+          applied_at: string | null
+          company_logo: string | null
+          company_name: string
+          created_at: string
+          id: string
+          job_title: string
+          job_type: string | null
+          job_url: string | null
+          location: string | null
+          notes: string | null
+          salary_currency: string | null
+          salary_max: number | null
+          salary_min: number | null
+          sort_order: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          company_logo?: string | null
+          company_name: string
+          created_at?: string
+          id?: string
+          job_title: string
+          job_type?: string | null
+          job_url?: string | null
+          location?: string | null
+          notes?: string | null
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          sort_order?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          company_logo?: string | null
+          company_name?: string
+          created_at?: string
+          id?: string
+          job_title?: string
+          job_type?: string | null
+          job_url?: string | null
+          location?: string | null
+          notes?: string | null
+          salary_currency?: string | null
+          salary_max?: number | null
+          salary_min?: number | null
+          sort_order?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           content: string | null

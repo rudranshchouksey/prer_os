@@ -10,13 +10,16 @@ import {
   Sparkles,
   LogOut,
   User,
-  FileText
+  FileText,
+  Briefcase,
+  Search,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { CommandMenu } from '@/components/CommandMenu';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -24,6 +27,7 @@ const navItems = [
   { path: '/docs', label: 'Docs', icon: FileText },
   { path: '/notes', label: 'Study Notes', icon: BookOpen },
   { path: '/questions', label: 'Interview Ready', icon: MessageSquareText },
+  { path: '/applications', label: 'Applications', icon: Briefcase },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -31,6 +35,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const { signOut, user } = useAuth();
 
   const handleLogout = async () => {
@@ -71,6 +76,28 @@ export function AppSidebar() {
             <p className="text-xs text-muted-foreground">Interview Prep</p>
           </motion.div>
         )}
+      </div>
+
+      {/* Search Button */}
+      <div className="px-4 pt-4">
+        <Button
+          variant="outline"
+          onClick={() => setCommandOpen(true)}
+          className={cn(
+            "w-full justify-start text-muted-foreground bg-muted/50 hover:bg-muted border-border",
+            collapsed && "justify-center px-0"
+          )}
+        >
+          <Search className="w-4 h-4" />
+          {!collapsed && (
+            <>
+              <span className="ml-2 flex-1 text-left">Search...</span>
+              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Navigation */}
@@ -153,6 +180,9 @@ export function AppSidebar() {
           )}
         </Button>
       </div>
+
+      {/* Command Menu */}
+      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
     </motion.aside>
   );
 }
