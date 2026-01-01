@@ -8,15 +8,17 @@ import {
   FileText,
   FolderOpen,
   Loader2,
-  BookOpen
+  BookOpen,
+  CheckCircle2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MacCodeBlock, MarkdownContent } from '@/components/CodeBlock';
+import { MarkdownContent } from '@/components/CodeBlock';
 import { useStudyModules } from '@/hooks/useStudyModules';
 import { ContributeNoteModal } from '@/components/ContributeNoteModal';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Topic {
   id: string;
@@ -31,6 +33,23 @@ interface Category {
   topics: Topic[];
   expanded?: boolean;
 }
+
+// Track read topics in localStorage for now (can be moved to DB later)
+const getReadTopics = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem('prepos-read-topics');
+    return new Set(stored ? JSON.parse(stored) : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const markTopicAsRead = (topicId: string): Set<string> => {
+  const readTopics = getReadTopics();
+  readTopics.add(topicId);
+  localStorage.setItem('prepos-read-topics', JSON.stringify([...readTopics]));
+  return readTopics;
+};
 
 const getDocContent = (topicId: string): string => {
   const docs: Record<string, string> = {
@@ -161,6 +180,7 @@ export default function Docs() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['react']));
   const [isContributeOpen, setIsContributeOpen] = useState(false);
+  const [readTopics, setReadTopics] = useState<Set<string>>(getReadTopics);
 
   const categories: Category[] = useMemo(() => {
     const modules = studyModules || [];
@@ -244,6 +264,19 @@ export default function Docs() {
   }, [categories, searchQuery]);
 
   const content = getDocContent(selectedTopic || 'default');
+  const isTopicRead = selectedTopic ? readTopics.has(selectedTopic) : false;
+
+  const handleMarkAsRead = () => {
+    if (selectedTopic) {
+      const updated = markTopicAsRead(selectedTopic);
+      setReadTopics(new Set(updated));
+      toast.success('Topic marked as read!');
+    }
+  };
+
+  // Calculate stats
+  const totalTopics = categories.reduce((acc, cat) => acc + cat.topics.length, 0);
+  const readCount = readTopics.size;
 
   if (isLoading) {
     return (
@@ -259,7 +292,7 @@ export default function Docs() {
     <MainLayout>
       <div className="flex h-[calc(100vh-2rem)] -m-6">
         {/* Secondary Sidebar for Docs Navigation */}
-        <aside className="w-72 border-r border-border bg-white/50 flex flex-col">
+        <aside className="w-72 border-r border-border bg-white/50 backdrop-blur-sm flex flex-col">
           {/* Sidebar Header */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-4">
@@ -286,6 +319,18 @@ export default function Docs() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 bg-muted/50 border-border h-9"
               />
+            </div>
+
+            {/* Progress Stats */}
+            <div className="flex gap-2 mt-3">
+              <div className="flex-1 text-center p-2 rounded-lg bg-muted/50">
+                <p className="text-lg font-bold text-foreground">{totalTopics}</p>
+                <p className="text-xs text-muted-foreground">Topics</p>
+              </div>
+              <div className="flex-1 text-center p-2 rounded-lg bg-success/10">
+                <p className="text-lg font-bold text-success">{readCount}</p>
+                <p className="text-xs text-muted-foreground">Read</p>
+              </div>
             </div>
           </div>
 
@@ -326,7 +371,11 @@ export default function Docs() {
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                             )}
                           >
-                            <FileText className="w-4 h-4" />
+                            {readTopics.has(topic.id) ? (
+                              <CheckCircle2 className="w-4 h-4 text-success" />
+                            ) : (
+                              <FileText className="w-4 h-4" />
+                            )}
                             <span>{topic.title}</span>
                           </button>
                         ))}
@@ -349,6 +398,25 @@ export default function Docs() {
               className="prose prose-lg max-w-none"
             >
               <MarkdownContent content={content} />
+              
+              {/* Mark as Read Button */}
+              {selectedTopic && selectedTopic !== 'default' && (
+                <div className="mt-8 pt-6 border-t border-border flex justify-end not-prose">
+                  <Button
+                    size="sm"
+                    variant={isTopicRead ? "outline" : "default"}
+                    onClick={handleMarkAsRead}
+                    disabled={isTopicRead}
+                    className={cn(
+                      "gap-2",
+                      isTopicRead && "text-success border-success/20"
+                    )}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {isTopicRead ? 'Marked as Read' : 'Mark as Read'}
+                  </Button>
+                </div>
+              )}
             </motion.div>
           </div>
         </main>

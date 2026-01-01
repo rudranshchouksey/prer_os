@@ -1,36 +1,36 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
+  ChevronRight, 
   ChevronDown, 
-  MessageSquareText,
+  Plus, 
   Search,
-  Plus,
-  Users
+  MessageSquareText,
+  FolderOpen,
+  Loader2,
+  Zap,
+  Users,
+  CheckCircle2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MarkdownContent } from '@/components/CodeBlock';
-import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { useStudyModules, Question } from '@/hooks/useStudyModules';
+import { useUserProgress, useUpdateProgress } from '@/hooks/useUserProgress';
+import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { VoteButtons } from '@/components/VoteButtons';
 import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { toast } from 'sonner';
 
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
+interface QuestionCardProps {
+  question: Question;
+  isMastered: boolean;
+  onMarkMastered: () => void;
+}
 
-function QuestionCard({ question }: { question: Question }) {
+function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const difficultyStyles = {
@@ -39,12 +39,10 @@ function QuestionCard({ question }: { question: Question }) {
     'Hard': 'bg-destructive/10 text-destructive border-destructive/20'
   };
 
-  const voteScore = (question.upvotes || 0) - (question.downvotes || 0);
-
   return (
     <motion.div
       layout
-      className="soft-card-hover overflow-hidden"
+      className="soft-card overflow-hidden"
     >
       <div className="flex">
         {/* Vote section */}
@@ -64,6 +62,12 @@ function QuestionCard({ question }: { question: Question }) {
           >
             <div className="flex-1 pr-4">
               <div className="flex items-center gap-2 flex-wrap mb-2">
+                {isMastered && (
+                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Mastered
+                  </Badge>
+                )}
                 {!question.is_system_generated && (
                   <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20">
                     <Users className="w-3 h-3 mr-1" />
@@ -111,6 +115,25 @@ function QuestionCard({ question }: { question: Question }) {
                       ))}
                     </div>
                   )}
+                  
+                  {/* Mark as Mastered Button */}
+                  <div className="mt-4 pt-4 border-t border-border flex justify-end">
+                    <Button
+                      size="sm"
+                      variant={isMastered ? "outline" : "default"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkMastered();
+                      }}
+                      className={cn(
+                        "gap-2",
+                        isMastered && "text-success border-success/20 hover:bg-success/10"
+                      )}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {isMastered ? 'Mastered' : 'Mark as Mastered'}
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -122,184 +145,312 @@ function QuestionCard({ question }: { question: Question }) {
 }
 
 export default function InterviewReady() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showContributeModal, setShowContributeModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'votes' | 'newest'>('votes');
-  
   const { data: studyModules, isLoading } = useStudyModules();
+  const { data: userProgress } = useUserProgress();
+  const updateProgress = useUpdateProgress();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [isContributeOpen, setIsContributeOpen] = useState(false);
 
-  // Get all questions from all modules
-  const allQuestions = studyModules?.flatMap(m => m.questions || []) || [];
-  
-  // Get unique categories with full module info
-  const categories = studyModules?.map(m => ({ id: m.id, title: m.title, category: m.category })) || [];
-  
-  // Filter and sort questions
-  const filteredQuestions = allQuestions
-    .filter(q => {
-      if (selectedCategory !== 'all' && q.module_id !== selectedCategory) return false;
-      if (selectedDifficulty !== 'all' && q.difficulty !== selectedDifficulty) return false;
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        q.question_text.toLowerCase().includes(query) ||
-        q.answer_text.toLowerCase().includes(query) ||
-        q.tags?.some(tag => tag.toLowerCase().includes(query))
-      );
-    })
-    .sort((a, b) => {
-      if (sortBy === 'votes') {
-        const scoreA = (a.upvotes || 0) - (a.downvotes || 0);
-        const scoreB = (b.upvotes || 0) - (b.downvotes || 0);
-        return scoreB - scoreA;
+  // Group modules by category
+  const categorizedModules = useMemo(() => {
+    if (!studyModules) return {};
+    
+    return studyModules.reduce((acc, module) => {
+      const cat = module.category || 'General';
+      if (!acc[cat]) {
+        acc[cat] = [];
       }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
+      acc[cat].push(module);
+      return acc;
+    }, {} as Record<string, typeof studyModules>);
+  }, [studyModules]);
 
-  const communityCount = allQuestions.filter(q => !q.is_system_generated).length;
+  const categories = Object.keys(categorizedModules);
+
+  // Auto-expand first category and select first module
+  useMemo(() => {
+    if (categories.length > 0 && expandedCategories.size === 0) {
+      setExpandedCategories(new Set([categories[0]]));
+      if (categorizedModules[categories[0]]?.length > 0) {
+        setSelectedCategory(categories[0]);
+        setSelectedModule(categorizedModules[categories[0]][0].id);
+      }
+    }
+  }, [categories, categorizedModules]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
+  // Get questions for selected module
+  const selectedModuleData = studyModules?.find(m => m.id === selectedModule);
+  const questions = selectedModuleData?.questions || [];
+
+  // Filter questions by search
+  const filteredQuestions = useMemo(() => {
+    if (!searchQuery.trim()) return questions;
+    const query = searchQuery.toLowerCase();
+    return questions.filter(q => 
+      q.question_text.toLowerCase().includes(query) ||
+      q.answer_text.toLowerCase().includes(query) ||
+      q.tags?.some(tag => tag.toLowerCase().includes(query))
+    );
+  }, [questions, searchQuery]);
+
+  // Check if question is mastered
+  const isQuestionMastered = (questionId: string) => {
+    return userProgress?.some(p => p.question_id === questionId && p.status === 'Mastered') || false;
+  };
+
+  // Handle mark as mastered
+  const handleMarkMastered = (questionId: string) => {
+    const currentStatus = isQuestionMastered(questionId);
+    updateProgress.mutate(
+      { 
+        questionId, 
+        status: currentStatus ? 'Review' : 'Mastered',
+        confidence: currentStatus ? 3 : 5
+      },
+      {
+        onSuccess: () => {
+          toast.success(currentStatus ? 'Moved back to review' : 'Marked as mastered!');
+        }
+      }
+    );
+  };
+
+  // Stats
+  const totalQuestions = studyModules?.reduce((acc, m) => acc + (m.questions?.length || 0), 0) || 0;
+  const masteredCount = userProgress?.filter(p => p.status === 'Mastered').length || 0;
+  const communityCount = studyModules?.reduce((acc, m) => 
+    acc + (m.questions?.filter(q => !q.is_system_generated).length || 0), 0) || 0;
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
-      <motion.div
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="space-y-6"
-      >
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-serif font-bold text-foreground mb-2">
-              Interview Ready
-            </h1>
-            <p className="text-muted-foreground">
-              Practice questions curated by the community
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {communityCount > 0 && (
-              <Badge variant="secondary" className="gap-1">
-                <Users className="w-3 h-3" />
-                {communityCount} community questions
-              </Badge>
-            )}
-            <Button onClick={() => setShowContributeModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Contribute
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="soft-card p-4">
-            <p className="text-sm text-muted-foreground">Total Questions</p>
-            <p className="text-2xl font-serif font-bold text-foreground">{allQuestions.length}</p>
-          </div>
-          <div className="soft-card p-4">
-            <p className="text-sm text-muted-foreground">Categories</p>
-            <p className="text-2xl font-serif font-bold text-foreground">{categories.length}</p>
-          </div>
-          <div className="soft-card p-4">
-            <p className="text-sm text-muted-foreground">Community</p>
-            <p className="text-2xl font-serif font-bold text-foreground">{communityCount}</p>
-          </div>
-          <div className="soft-card p-4">
-            <p className="text-sm text-muted-foreground">Total Votes</p>
-            <p className="text-2xl font-serif font-bold text-foreground">
-              {allQuestions.reduce((acc, q) => acc + (q.upvotes || 0) + (q.downvotes || 0), 0)}
-            </p>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="soft-card p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
+      <div className="flex h-[calc(100vh-2rem)] -m-6">
+        {/* Secondary Sidebar for Interview Navigation */}
+        <aside className="w-72 border-r border-border bg-white/50 backdrop-blur-sm flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                <h2 className="font-semibold text-foreground">Interview Ready</h2>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setIsContributeOpen(true)}
+                className="bg-primary hover:bg-primary/90 h-8"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </Button>
+            </div>
+            
+            {/* Search */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search questions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9 bg-muted/50 border-border h-9"
               />
             </div>
-            <div className="flex gap-3">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="Easy">Easy</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'votes' | 'newest')}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="votes">Most Voted</SelectItem>
-                  <SelectItem value="newest">Newest</SelectItem>
-                </SelectContent>
-              </Select>
+            
+            {/* Stats */}
+            <div className="flex gap-2 mt-3">
+              <div className="flex-1 text-center p-2 rounded-lg bg-muted/50">
+                <p className="text-lg font-bold text-foreground">{totalQuestions}</p>
+                <p className="text-xs text-muted-foreground">Questions</p>
+              </div>
+              <div className="flex-1 text-center p-2 rounded-lg bg-success/10">
+                <p className="text-lg font-bold text-success">{masteredCount}</p>
+                <p className="text-xs text-muted-foreground">Mastered</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Questions List */}
-        <div className="space-y-4">
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="soft-card h-24 animate-shimmer" />
-              ))}
-            </div>
-          ) : filteredQuestions.length === 0 ? (
-            <div className="soft-card p-12 text-center">
-              <MessageSquareText className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-serif font-semibold text-foreground mb-2">
-                No questions found
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || selectedCategory !== 'all' || selectedDifficulty !== 'all' 
-                  ? 'Try adjusting your filters' 
-                  : 'Be the first to contribute a question!'}
-              </p>
-              <Button onClick={() => setShowContributeModal(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Question
-              </Button>
-            </div>
-          ) : (
-            filteredQuestions.map(question => (
-              <QuestionCard key={question.id} question={question} />
-            ))
-          )}
-        </div>
+          {/* Categories List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            {categories.map((category) => (
+              <div key={category}>
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  {expandedCategories.has(category) ? (
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  )}
+                  <FolderOpen className="w-4 h-4 text-primary" />
+                  <span>{category}</span>
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {categorizedModules[category]?.reduce((acc, m) => acc + (m.questions?.length || 0), 0) || 0}
+                  </Badge>
+                </button>
 
-        <ContributeQuestionModal 
-          isOpen={showContributeModal} 
-          onClose={() => setShowContributeModal(false)}
-          modules={categories}
-        />
-      </motion.div>
+                <AnimatePresence>
+                  {expandedCategories.has(category) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pl-6 py-1 space-y-0.5">
+                        {categorizedModules[category]?.map((module) => {
+                          const moduleQuestionCount = module.questions?.length || 0;
+                          const moduleMasteredCount = module.questions?.filter(q => 
+                            userProgress?.some(p => p.question_id === q.id && p.status === 'Mastered')
+                          ).length || 0;
+                          
+                          return (
+                            <button
+                              key={module.id}
+                              onClick={() => {
+                                setSelectedCategory(category);
+                                setSelectedModule(module.id);
+                              }}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left",
+                                selectedModule === module.id
+                                  ? "bg-primary/10 text-primary font-medium"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                              )}
+                            >
+                              <MessageSquareText className="w-4 h-4" />
+                              <span className="flex-1 truncate">{module.title}</span>
+                              {moduleMasteredCount > 0 && (
+                                <span className="text-xs text-success">
+                                  {moduleMasteredCount}/{moduleQuestionCount}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background to-muted/20">
+          <div className="max-w-4xl mx-auto p-8">
+            {selectedModuleData ? (
+              <motion.div
+                key={selectedModule}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {/* Module Header */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <span>{selectedCategory}</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-foreground font-medium">{selectedModuleData.title}</span>
+                  </div>
+                  <h1 className="text-2xl font-serif font-bold text-foreground mb-2">
+                    {selectedModuleData.title}
+                  </h1>
+                  {selectedModuleData.description && (
+                    <p className="text-muted-foreground">{selectedModuleData.description}</p>
+                  )}
+                  
+                  {/* Progress indicator */}
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Progress:</span>
+                      <span className="font-medium text-foreground">
+                        {questions.filter(q => isQuestionMastered(q.id)).length} / {questions.length} mastered
+                      </span>
+                    </div>
+                    {communityCount > 0 && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Users className="w-3 h-3" />
+                        {communityCount} community
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Questions List */}
+                <div className="space-y-4">
+                  {filteredQuestions.length === 0 ? (
+                    <div className="soft-card p-12 text-center">
+                      <MessageSquareText className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
+                      <h3 className="text-lg font-serif font-semibold text-foreground mb-2">
+                        No questions found
+                      </h3>
+                      <p className="text-muted-foreground mb-4">
+                        {searchQuery 
+                          ? 'Try adjusting your search' 
+                          : 'Be the first to contribute a question!'}
+                      </p>
+                      <Button onClick={() => setIsContributeOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Question
+                      </Button>
+                    </div>
+                  ) : (
+                    filteredQuestions.map(question => (
+                      <QuestionCard 
+                        key={question.id} 
+                        question={question}
+                        isMastered={isQuestionMastered(question.id)}
+                        onMarkMastered={() => handleMarkMastered(question.id)}
+                      />
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <Zap className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                <h2 className="text-xl font-serif font-semibold text-foreground mb-2">
+                  Select a Topic
+                </h2>
+                <p className="text-muted-foreground">
+                  Choose a category and topic from the sidebar to view questions
+                </p>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      <ContributeQuestionModal 
+        isOpen={isContributeOpen} 
+        onClose={() => setIsContributeOpen(false)}
+        modules={studyModules?.map(m => ({ id: m.id, title: m.title, category: m.category })) || []}
+      />
     </MainLayout>
   );
 }
