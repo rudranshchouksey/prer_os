@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Zap,
   ArrowRight,
-  Settings
+  Settings,
+  CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -17,11 +18,12 @@ import { AnimatedProgress } from '@/components/ui/animated-progress';
 import { CountdownTimer } from '@/components/ui/countdown-timer';
 import { StreakCounter } from '@/components/ui/streak-counter';
 import { useStore } from '@/store/useStore';
-import { techVaultData } from '@/data/techVaultData';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import { useUserSettings, useTrackActivity } from '@/hooks/useUserSettings';
+import { useUserProgress, useProgressStats } from '@/hooks/useUserProgress';
+import { useStudyModules } from '@/hooks/useStudyModules';
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -41,14 +43,14 @@ export default function Dashboard() {
     dailyStreak, 
     interviewDate, 
     setInterviewDate,
-    totalQuestionsAnswered,
-    flashcardProgress,
-    studyItems,
     incrementStreak
   } = useStore();
 
   const { data: settings } = useUserSettings();
   const { trackActivity } = useTrackActivity();
+  const { data: userProgress } = useUserProgress();
+  const { data: studyModules } = useStudyModules();
+  const progressStats = useProgressStats();
   const [showDateInput, setShowDateInput] = useState(false);
 
   // Track activity on load
@@ -56,22 +58,38 @@ export default function Dashboard() {
     trackActivity();
   }, []);
 
-  // Calculate stats
+  // Calculate real stats from database
   const stats = useMemo(() => {
-    const totalQuestions = techVaultData.reduce((acc, cat) => acc + cat.questions.length, 0);
-    const reviewedQuestions = Object.keys(flashcardProgress).length;
-    const highConfidence = Object.values(flashcardProgress).filter(p => p.confidence === 'high').length;
-    const completedItems = studyItems.filter(item => item.status === 'applied').length;
+    const totalQuestions = studyModules?.reduce((acc, m) => acc + (m.questions?.length || 0), 0) || 0;
+    const masteredQuestions = userProgress?.filter(p => p.status === 'Mastered').length || 0;
+    const reviewQuestions = userProgress?.filter(p => p.status === 'Review').length || 0;
+    const newQuestions = totalQuestions - masteredQuestions - reviewQuestions;
+    
+    // Calculate category breakdown
+    const categoryProgress = studyModules?.reduce((acc, module) => {
+      const cat = module.category || 'General';
+      if (!acc[cat]) {
+        acc[cat] = { total: 0, mastered: 0, review: 0 };
+      }
+      const moduleQuestions = module.questions || [];
+      acc[cat].total += moduleQuestions.length;
+      moduleQuestions.forEach(q => {
+        const progress = userProgress?.find(p => p.question_id === q.id);
+        if (progress?.status === 'Mastered') acc[cat].mastered++;
+        else if (progress?.status === 'Review') acc[cat].review++;
+      });
+      return acc;
+    }, {} as Record<string, { total: number; mastered: number; review: number }>) || {};
     
     return {
       totalQuestions,
-      reviewedQuestions,
-      progressPercent: Math.round((reviewedQuestions / totalQuestions) * 100),
-      highConfidence,
-      completedItems,
-      mustDoItems: studyItems.filter(item => item.status === 'must-do').length
+      masteredQuestions,
+      reviewQuestions,
+      newQuestions,
+      progressPercent: totalQuestions > 0 ? Math.round((masteredQuestions / totalQuestions) * 100) : 0,
+      categoryProgress
     };
-  }, [flashcardProgress, studyItems]);
+  }, [studyModules, userProgress]);
 
   // Trigger streak increment on page load
   useMemo(() => {
@@ -184,56 +202,62 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Real Data */}
         <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
               <Brain className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-3xl font-serif font-bold text-foreground">{totalQuestionsAnswered}</p>
-            <p className="text-sm text-muted-foreground">Questions Answered</p>
-          </div>
-
-          <div className="soft-card p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center mx-auto mb-3">
-              <Target className="w-6 h-6 text-primary" />
-            </div>
-            <p className="text-3xl font-serif font-bold text-foreground">{stats.highConfidence}</p>
-            <p className="text-sm text-muted-foreground">High Confidence</p>
+            <p className="text-3xl font-serif font-bold text-foreground">{stats.totalQuestions}</p>
+            <p className="text-sm text-muted-foreground">Total Questions</p>
           </div>
 
           <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center mx-auto mb-3">
-              <BookOpen className="w-6 h-6 text-success" />
+              <CheckCircle2 className="w-6 h-6 text-success" />
             </div>
-            <p className="text-3xl font-serif font-bold text-success">{stats.completedItems}</p>
-            <p className="text-sm text-muted-foreground">Topics Applied</p>
+            <p className="text-3xl font-serif font-bold text-success">{stats.masteredQuestions}</p>
+            <p className="text-sm text-muted-foreground">Mastered</p>
           </div>
 
           <div className="soft-card p-4 text-center">
             <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center mx-auto mb-3">
-              <TrendingUp className="w-6 h-6 text-warning" />
+              <Target className="w-6 h-6 text-warning" />
             </div>
-            <p className="text-3xl font-serif font-bold text-warning">{stats.mustDoItems}</p>
-            <p className="text-sm text-muted-foreground">Must-Do Items</p>
+            <p className="text-3xl font-serif font-bold text-warning">{stats.reviewQuestions}</p>
+            <p className="text-sm text-muted-foreground">In Review</p>
+          </div>
+
+          <div className="soft-card p-4 text-center">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+              <BookOpen className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-3xl font-serif font-bold text-foreground">{stats.newQuestions}</p>
+            <p className="text-sm text-muted-foreground">New</p>
           </div>
         </motion.div>
 
-        {/* Progress Section */}
+        {/* Overall Progress Section */}
         <motion.div variants={itemVariants}>
           <div className="soft-card p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-serif font-semibold text-foreground">Overall Progress</h2>
               <span className="text-sm text-muted-foreground">
-                {stats.reviewedQuestions} of {stats.totalQuestions} questions reviewed
+                {stats.masteredQuestions} of {stats.totalQuestions} questions mastered
               </span>
             </div>
             <AnimatedProgress 
-              value={stats.reviewedQuestions} 
-              max={stats.totalQuestions}
+              value={stats.masteredQuestions} 
+              max={stats.totalQuestions || 1}
               size="lg"
-              color="blue"
+              color="green"
             />
+            <div className="flex items-center justify-between mt-3 text-sm">
+              <span className="text-success font-medium">{stats.progressPercent}% Complete</span>
+              <span className="text-muted-foreground">
+                {stats.totalQuestions - stats.masteredQuestions} remaining
+              </span>
+            </div>
           </div>
         </motion.div>
 
@@ -242,21 +266,31 @@ export default function Dashboard() {
           <div className="soft-card p-6">
             <h2 className="text-lg font-serif font-semibold text-foreground mb-6">Category Breakdown</h2>
             <div className="space-y-4">
-              {techVaultData.map(category => {
-                const reviewed = category.questions.filter(q => flashcardProgress[q.id]).length;
-                const total = category.questions.length;
+              {Object.entries(stats.categoryProgress).map(([category, data], index) => {
+                const colors = ['blue', 'green', 'purple'] as const;
+                const color = colors[index % colors.length];
                 return (
-                  <div key={category.id}>
+                  <div key={category}>
                     <AnimatedProgress
-                      value={reviewed}
-                      max={total}
-                      label={category.title}
-                      color={category.id.includes('cloud') ? 'purple' : category.id.includes('core') ? 'green' : 'blue'}
+                      value={data.mastered}
+                      max={data.total || 1}
+                      label={category}
+                      color={color}
                       size="md"
                     />
+                    <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+                      <span>{data.mastered} mastered</span>
+                      <span>{data.review} in review</span>
+                      <span>{data.total - data.mastered - data.review} new</span>
+                    </div>
                   </div>
                 );
               })}
+              {Object.keys(stats.categoryProgress).length === 0 && (
+                <p className="text-center text-muted-foreground py-4">
+                  No categories found. Start adding questions to see progress.
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -280,7 +314,7 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          <Link to="/notes">
+          <Link to="/docs">
             <div className="soft-card-hover p-6 group cursor-pointer h-full">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -299,32 +333,39 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Recent Activity */}
-        {Object.keys(flashcardProgress).length > 0 && (
+        {userProgress && userProgress.length > 0 && (
           <motion.div variants={itemVariants}>
             <div className="soft-card p-6">
-              <h2 className="text-lg font-serif font-semibold text-foreground mb-4">Recent Reviews</h2>
+              <h2 className="text-lg font-serif font-semibold text-foreground mb-4">Recent Activity</h2>
               <div className="space-y-3">
-                {Object.values(flashcardProgress)
-                  .sort((a, b) => new Date(b.lastReviewed).getTime() - new Date(a.lastReviewed).getTime())
+                {userProgress
+                  .filter(p => p.last_reviewed_at)
+                  .sort((a, b) => new Date(b.last_reviewed_at || 0).getTime() - new Date(a.last_reviewed_at || 0).getTime())
                   .slice(0, 5)
                   .map(progress => {
-                    const question = techVaultData
-                      .flatMap(c => c.questions)
-                      .find(q => q.id === progress.questionId);
+                    // Find the question
+                    const question = studyModules
+                      ?.flatMap(m => m.questions || [])
+                      .find(q => q.id === progress.question_id);
                     if (!question) return null;
+                    
                     return (
-                      <div key={progress.questionId} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                      <div key={progress.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className={cn(
                             "w-2 h-2 rounded-full",
-                            progress.confidence === 'high' && "bg-success",
-                            progress.confidence === 'medium' && "bg-warning",
-                            progress.confidence === 'low' && "bg-destructive"
+                            progress.status === 'Mastered' && "bg-success",
+                            progress.status === 'Review' && "bg-warning",
+                            progress.status === 'New' && "bg-muted-foreground"
                           )} />
-                          <p className="text-sm text-foreground truncate">{question.question}</p>
+                          <p className="text-sm text-foreground truncate">{question.question_text}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground ml-4">
-                          {progress.reviewCount}x
+                        <span className={cn(
+                          "text-xs font-medium ml-4",
+                          progress.status === 'Mastered' && "text-success",
+                          progress.status === 'Review' && "text-warning"
+                        )}>
+                          {progress.status}
                         </span>
                       </div>
                     );
