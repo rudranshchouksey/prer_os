@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { AnimatedProgress } from '@/components/ui/animated-progress';
 import { CountdownTimer } from '@/components/ui/countdown-timer';
 import { StreakCounter } from '@/components/ui/streak-counter';
+import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -200,6 +201,11 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* Activity Heatmap */}
+        <motion.div variants={itemVariants}>
+          <ActivityHeatmap />
         </motion.div>
 
         {/* Stats Grid - Real Data */}

@@ -10,17 +10,22 @@ import {
   Loader2,
   Zap,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MarkdownContent } from '@/components/CodeBlock';
 import { useStudyModules, Question } from '@/hooks/useStudyModules';
 import { useUserProgress, useUpdateProgress } from '@/hooks/useUserProgress';
 import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { VoteButtons } from '@/components/VoteButtons';
+import { gradeAnswer } from '@/services/ai';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -30,13 +35,51 @@ interface QuestionCardProps {
   onMarkMastered: () => void;
 }
 
+interface AnswerGradeResult {
+  score: number;
+  maxScore: number;
+  feedback: string;
+  strengths: string[];
+  improvements: string[];
+}
+
 function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [isGrading, setIsGrading] = useState(false);
+  const [gradeResult, setGradeResult] = useState<AnswerGradeResult | null>(null);
 
   const difficultyStyles = {
     'Easy': 'bg-success/10 text-success border-success/20',
     'Medium': 'bg-warning/10 text-warning border-warning/20',
     'Hard': 'bg-destructive/10 text-destructive border-destructive/20'
+  };
+
+  const handleGradeAnswer = async () => {
+    if (!userAnswer.trim()) {
+      toast.error('Please enter your answer first');
+      return;
+    }
+
+    setIsGrading(true);
+    try {
+      const result = await gradeAnswer({
+        question: question.question_text,
+        expectedAnswer: question.answer_text,
+        userAnswer,
+      });
+      setGradeResult(result);
+    } catch (error) {
+      toast.error('Failed to analyze answer');
+    } finally {
+      setIsGrading(false);
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return 'text-success';
+    if (score >= 6) return 'text-warning';
+    return 'text-destructive';
   };
 
   return (
@@ -115,6 +158,82 @@ function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProp
                       ))}
                     </div>
                   )}
+
+                  {/* AI Answer Grader Section */}
+                  <div className="mt-4 pt-4 border-t border-border space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">Practice Your Answer</span>
+                    </div>
+                    
+                    <Textarea
+                      placeholder="Type your answer here to get AI feedback..."
+                      value={userAnswer}
+                      onChange={(e) => setUserAnswer(e.target.value)}
+                      rows={4}
+                      className="resize-none"
+                    />
+                    
+                    <Button
+                      onClick={handleGradeAnswer}
+                      disabled={isGrading || !userAnswer.trim()}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      {isGrading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          Analyze with AI
+                        </>
+                      )}
+                    </Button>
+
+                    {gradeResult && (
+                      <Alert className={cn(
+                        "border-2",
+                        gradeResult.score >= 8 && "border-success/50 bg-success/5",
+                        gradeResult.score >= 6 && gradeResult.score < 8 && "border-warning/50 bg-warning/5",
+                        gradeResult.score < 6 && "border-destructive/50 bg-destructive/5"
+                      )}>
+                        <AlertCircle className="w-4 h-4" />
+                        <AlertTitle className="flex items-center gap-2">
+                          Score: <span className={cn("font-bold", getScoreColor(gradeResult.score))}>
+                            {gradeResult.score}/{gradeResult.maxScore}
+                          </span>
+                        </AlertTitle>
+                        <AlertDescription className="space-y-3 mt-2">
+                          <p>{gradeResult.feedback}</p>
+                          
+                          {gradeResult.strengths.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-success mb-1">✓ Strengths:</p>
+                              <ul className="text-sm space-y-0.5 pl-4">
+                                {gradeResult.strengths.map((s, i) => (
+                                  <li key={i}>• {s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {gradeResult.improvements.length > 0 && (
+                            <div>
+                              <p className="text-sm font-medium text-warning mb-1">→ Areas to improve:</p>
+                              <ul className="text-sm space-y-0.5 pl-4">
+                                {gradeResult.improvements.map((imp, i) => (
+                                  <li key={i}>• {imp}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
                   
                   {/* Mark as Mastered Button */}
                   <div className="mt-4 pt-4 border-t border-border flex justify-end">
