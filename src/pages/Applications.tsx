@@ -32,6 +32,9 @@ import {
   Edit,
   Loader2,
   GripVertical,
+  Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -60,6 +63,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useJobApplications,
   useCreateJobApplication,
@@ -69,6 +73,7 @@ import {
   JobApplication,
   ApplicationStatus,
 } from '@/hooks/useJobApplications';
+import { generateCoverLetter } from '@/services/ai';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
@@ -461,7 +466,7 @@ function AddApplicationModal({
   );
 }
 
-// Edit Application Modal
+// Edit Application Modal with Cover Letter Generator
 function EditApplicationModal({
   application,
   isOpen,
@@ -485,6 +490,12 @@ function EditApplicationModal({
     status: application.status,
   });
 
+  // Cover letter state
+  const [jobDescription, setJobDescription] = useState('');
+  const [coverLetter, setCoverLetter] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     setFormData({
       company_name: application.company_name,
@@ -498,6 +509,8 @@ function EditApplicationModal({
       notes: application.notes || '',
       status: application.status,
     });
+    setCoverLetter('');
+    setJobDescription('');
   }, [application]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -525,83 +538,188 @@ function EditApplicationModal({
     );
   };
 
+  const handleGenerateCoverLetter = async () => {
+    if (!jobDescription.trim()) {
+      toast.error('Please paste the job description first');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await generateCoverLetter({
+        companyName: application.company_name,
+        jobTitle: application.job_title,
+        jobDescription,
+      });
+      setCoverLetter(result.coverLetter);
+      toast.success('Cover letter generated!');
+    } catch (error) {
+      toast.error('Failed to generate cover letter');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyCoverLetter = () => {
+    navigator.clipboard.writeText(coverLetter);
+    setCopied(true);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-serif">Edit Application</DialogTitle>
+          <DialogTitle className="font-serif">Edit Application - {application.company_name}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="cover-letter" className="gap-2">
+              <Sparkles className="w-4 h-4" />
+              Cover Letter
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-company">Company *</Label>
+                  <Input
+                    id="edit-company"
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-title">Job Title *</Label>
+                  <Input
+                    id="edit-title"
+                    value={formData.job_title}
+                    onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-location">Location</Label>
+                  <Input
+                    id="edit-location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(v) => setFormData({ ...formData, status: v as ApplicationStatus })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APPLICATION_STATUSES.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateApplication.isPending}>
+                  {updateApplication.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="cover-letter" className="mt-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-company">Company *</Label>
-              <Input
-                id="edit-company"
-                value={formData.company_name}
-                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                required
+              <Label htmlFor="job-description">Paste Job Description</Label>
+              <Textarea
+                id="job-description"
+                value={jobDescription}
+                onChange={(e) => setJobDescription(e.target.value)}
+                placeholder="Paste the full job description here..."
+                rows={6}
+                className="resize-none"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Job Title *</Label>
-              <Input
-                id="edit-title"
-                value={formData.job_title}
-                onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
-                required
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-location">Location</Label>
-              <Input
-                id="edit-location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) => setFormData({ ...formData, status: v as ApplicationStatus })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {APPLICATION_STATUSES.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-notes">Notes</Label>
-            <Textarea
-              id="edit-notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+            <Button
+              onClick={handleGenerateCoverLetter}
+              disabled={isGenerating || !jobDescription.trim()}
+              className="w-full gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate Cover Letter
+                </>
+              )}
             </Button>
-            <Button type="submit" disabled={updateApplication.isPending}>
-              {updateApplication.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </form>
+
+            {coverLetter && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Generated Cover Letter</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopyCoverLetter}
+                    className="gap-2"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 border border-border max-h-[300px] overflow-y-auto">
+                  <pre className="text-sm whitespace-pre-wrap font-sans text-foreground">
+                    {coverLetter}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
