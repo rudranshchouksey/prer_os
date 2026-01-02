@@ -66,9 +66,22 @@ export default function Dashboard() {
     const reviewQuestions = userProgress?.filter(p => p.status === 'Review').length || 0;
     const newQuestions = totalQuestions - masteredQuestions - reviewQuestions;
     
-    // Calculate category breakdown
+    // Calculate category breakdown - filtered by user interests
+    const userCategories = settings?.interested_categories || [];
     const categoryProgress = studyModules?.reduce((acc, module) => {
       const cat = module.category || 'General';
+      
+      // If user has interests, only show those categories
+      if (userCategories.length > 0) {
+        const catNormalized = cat.toLowerCase().replace(/\s+/g, '-');
+        const isInterested = userCategories.some(interest => 
+          catNormalized.includes(interest.toLowerCase()) || 
+          interest.toLowerCase().includes(catNormalized) ||
+          cat.toLowerCase().includes(interest.toLowerCase())
+        );
+        if (!isInterested) return acc;
+      }
+      
       if (!acc[cat]) {
         acc[cat] = { total: 0, mastered: 0, review: 0 };
       }
@@ -90,7 +103,7 @@ export default function Dashboard() {
       progressPercent: totalQuestions > 0 ? Math.round((masteredQuestions / totalQuestions) * 100) : 0,
       categoryProgress
     };
-  }, [studyModules, userProgress]);
+  }, [studyModules, userProgress, settings?.interested_categories]);
 
   // Trigger streak increment on page load
   useMemo(() => {

@@ -12,7 +12,9 @@ import {
   Users,
   CheckCircle2,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -20,12 +22,41 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { MarkdownContent } from '@/components/CodeBlock';
 import { useStudyModules, Question } from '@/hooks/useStudyModules';
 import { useUserProgress, useUpdateProgress } from '@/hooks/useUserProgress';
 import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { VoteButtons } from '@/components/VoteButtons';
 import { gradeAnswer } from '@/services/ai';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -33,6 +64,8 @@ interface QuestionCardProps {
   question: Question;
   isMastered: boolean;
   onMarkMastered: () => void;
+  onEdit: (question: Question) => void;
+  onDelete: (questionId: string) => void;
 }
 
 interface AnswerGradeResult {
@@ -43,11 +76,12 @@ interface AnswerGradeResult {
   improvements: string[];
 }
 
-function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProps) {
+function QuestionCard({ question, isMastered, onMarkMastered, onEdit, onDelete }: QuestionCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
   const [isGrading, setIsGrading] = useState(false);
   const [gradeResult, setGradeResult] = useState<AnswerGradeResult | null>(null);
+  const { user } = useAuth();
 
   const difficultyStyles = {
     'Easy': 'bg-success/10 text-success border-success/20',
@@ -85,7 +119,7 @@ function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProp
   return (
     <motion.div
       layout
-      className="soft-card overflow-hidden"
+      className="soft-card overflow-hidden group relative"
     >
       <div className="flex">
         {/* Vote section */}
@@ -96,6 +130,52 @@ function QuestionCard({ question, isMastered, onMarkMastered }: QuestionCardProp
             downvotes={question.downvotes || 0}
           />
         </div>
+        
+        {/* Edit/Delete buttons - Wiki style */}
+        {user && (
+          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(question);
+              }}
+            >
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this question?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this community contribution? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(question.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
         
         {/* Question content */}
         <div className="flex-1">
@@ -267,12 +347,18 @@ export default function InterviewReady() {
   const { data: studyModules, isLoading } = useStudyModules();
   const { data: userProgress } = useUserProgress();
   const updateProgress = useUpdateProgress();
+  const queryClient = useQueryClient();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [isContributeOpen, setIsContributeOpen] = useState(false);
+  
+  // Edit question state
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editFormData, setEditFormData] = useState({ question_text: '', answer_text: '', difficulty: 'Medium' });
+  const [isEditSaving, setIsEditSaving] = useState(false);
 
   // Group modules by category
   const categorizedModules = useMemo(() => {
@@ -348,6 +434,59 @@ export default function InterviewReady() {
         }
       }
     );
+  };
+
+  // Handle edit question (Wiki-style)
+  const handleEditQuestion = (question: Question) => {
+    setEditingQuestion(question);
+    setEditFormData({
+      question_text: question.question_text,
+      answer_text: question.answer_text,
+      difficulty: question.difficulty || 'Medium'
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingQuestion) return;
+    
+    setIsEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          question_text: editFormData.question_text,
+          answer_text: editFormData.answer_text,
+          difficulty: editFormData.difficulty
+        })
+        .eq('id', editingQuestion.id);
+      
+      if (error) throw error;
+      
+      toast.success('Question updated!');
+      setEditingQuestion(null);
+      queryClient.invalidateQueries({ queryKey: ['study-modules'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update question');
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
+  // Handle delete question (Wiki-style)
+  const handleDeleteQuestion = async (questionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .delete()
+        .eq('id', questionId);
+      
+      if (error) throw error;
+      
+      toast.success('Question deleted');
+      queryClient.invalidateQueries({ queryKey: ['study-modules'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete question');
+    }
   };
 
   // Stats
@@ -545,6 +684,8 @@ export default function InterviewReady() {
                         question={question}
                         isMastered={isQuestionMastered(question.id)}
                         onMarkMastered={() => handleMarkMastered(question.id)}
+                        onEdit={handleEditQuestion}
+                        onDelete={handleDeleteQuestion}
                       />
                     ))
                   )}
@@ -570,6 +711,61 @@ export default function InterviewReady() {
         onClose={() => setIsContributeOpen(false)}
         modules={studyModules?.map(m => ({ id: m.id, title: m.title, category: m.category })) || []}
       />
+
+      {/* Edit Question Modal */}
+      <Dialog open={!!editingQuestion} onOpenChange={(open) => !open && setEditingQuestion(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Question</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-question">Question *</Label>
+              <Textarea
+                id="edit-question"
+                value={editFormData.question_text}
+                onChange={(e) => setEditFormData({ ...editFormData, question_text: e.target.value })}
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-answer">Answer *</Label>
+              <Textarea
+                id="edit-answer"
+                value={editFormData.answer_text}
+                onChange={(e) => setEditFormData({ ...editFormData, answer_text: e.target.value })}
+                rows={6}
+                className="font-mono text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-difficulty">Difficulty</Label>
+              <Select
+                value={editFormData.difficulty}
+                onValueChange={(v) => setEditFormData({ ...editFormData, difficulty: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingQuestion(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isEditSaving}>
+              {isEditSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

@@ -138,7 +138,7 @@ export function ActivityHeatmap() {
   }, [activityMap]);
 
   return (
-    <div className="soft-card p-6">
+    <div className="soft-card p-6 w-full col-span-full">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-serif font-semibold text-foreground">Activity</h2>
