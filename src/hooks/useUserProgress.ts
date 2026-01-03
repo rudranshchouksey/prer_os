@@ -124,7 +124,9 @@ export function useUpdateProgress() {
       }
     },
     onSettled: () => {
+      // Invalidate all user-progress queries to sync Dashboard
       queryClient.invalidateQueries({ queryKey: ['user-progress'] });
+      queryClient.invalidateQueries({ queryKey: ['all-questions-count'] });
     }
   });
 }
