@@ -9,14 +9,38 @@ import {
   FolderOpen,
   Loader2,
   BookOpen,
-  CheckCircle2
+  CheckCircle2,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { MarkdownContent } from '@/components/CodeBlock';
 import { useStudyModules } from '@/hooks/useStudyModules';
+import { useUserNotes, useUpdateNote, useDeleteNote } from '@/hooks/useUserNotes';
 import { ContributeNoteModal } from '@/components/ContributeNoteModal';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -176,11 +200,21 @@ Each topic includes:
 
 export default function Docs() {
   const { data: studyModules, isLoading } = useStudyModules();
+  const { data: userNotes } = useUserNotes();
+  const updateNote = useUpdateNote();
+  const deleteNote = useDeleteNote();
+  const { user } = useAuth();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['react']));
   const [isContributeOpen, setIsContributeOpen] = useState(false);
   const [readTopics, setReadTopics] = useState<Set<string>>(getReadTopics);
+  
+  // Edit state for wiki-style editing
+  const [editingTopic, setEditingTopic] = useState<{ id: string; title: string; content: string } | null>(null);
+  const [editFormData, setEditFormData] = useState({ title: '', content: '' });
+  const [isEditSaving, setIsEditSaving] = useState(false);
 
   const categories: Category[] = useMemo(() => {
     const modules = studyModules || [];
@@ -205,7 +239,7 @@ export default function Docs() {
     }, {} as Record<string, Category>);
 
     // Add some sample topics for demonstration
-    return [
+    const baseCategories = [
       {
         id: 'react',
         name: 'React.js',
@@ -236,7 +270,23 @@ export default function Docs() {
       },
       ...Object.values(grouped)
     ];
-  }, [studyModules]);
+    
+    // Add user notes as a category if they exist
+    if (userNotes && userNotes.length > 0) {
+      baseCategories.push({
+        id: 'my-notes',
+        name: 'My Notes',
+        icon: 'FileText',
+        topics: userNotes.map(note => ({
+          id: `note-${note.id}`,
+          title: note.title,
+          content: note.content || ''
+        }))
+      });
+    }
+    
+    return baseCategories;
+  }, [studyModules, userNotes]);
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => {
@@ -263,7 +313,14 @@ export default function Docs() {
     })).filter(cat => cat.topics.length > 0);
   }, [categories, searchQuery]);
 
-  const content = getDocContent(selectedTopic || 'default');
+  // Check if selected topic is a user note
+  const isUserNote = selectedTopic?.startsWith('note-');
+  const selectedNoteId = isUserNote ? selectedTopic?.replace('note-', '') : null;
+  const selectedNote = userNotes?.find(n => n.id === selectedNoteId);
+  
+  const content = isUserNote && selectedNote 
+    ? selectedNote.content || '# ' + selectedNote.title + '\n\nNo content yet.'
+    : getDocContent(selectedTopic || 'default');
   const isTopicRead = selectedTopic ? readTopics.has(selectedTopic) : false;
 
   const handleMarkAsRead = () => {
@@ -271,6 +328,52 @@ export default function Docs() {
       const updated = markTopicAsRead(selectedTopic);
       setReadTopics(new Set(updated));
       toast.success('Topic marked as read!');
+    }
+  };
+
+  // Wiki-style edit handlers
+  const handleEditTopic = () => {
+    if (isUserNote && selectedNote) {
+      setEditingTopic({
+        id: selectedNote.id,
+        title: selectedNote.title,
+        content: selectedNote.content || ''
+      });
+      setEditFormData({
+        title: selectedNote.title,
+        content: selectedNote.content || ''
+      });
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTopic) return;
+    
+    setIsEditSaving(true);
+    try {
+      await updateNote.mutateAsync({
+        id: editingTopic.id,
+        title: editFormData.title,
+        content: editFormData.content
+      });
+      toast.success('Note updated!');
+      setEditingTopic(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update note');
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
+  const handleDeleteTopic = async () => {
+    if (!selectedNoteId) return;
+    
+    try {
+      await deleteNote.mutateAsync(selectedNoteId);
+      toast.success('Note deleted');
+      setSelectedTopic(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete note');
     }
   };
 
@@ -397,11 +500,55 @@ export default function Docs() {
               animate={{ opacity: 1, y: 0 }}
               className="prose prose-lg max-w-none"
             >
+              {/* Wiki-style Edit/Delete buttons for user notes */}
+              {isUserNote && user && (
+                <div className="not-prose flex gap-2 mb-4 justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEditTopic}
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this community contribution? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteTopic}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              )}
+              
               <MarkdownContent content={content} />
               
               {/* Mark as Read Button */}
               {selectedTopic && selectedTopic !== 'default' && (
-                <div className="mt-8 pt-6 border-t border-border flex justify-end not-prose">
+                <div className="mt-8 pt-6 border-t border-border flex justify-end gap-2 not-prose">
                   <Button
                     size="sm"
                     variant={isTopicRead ? "outline" : "default"}
@@ -421,6 +568,44 @@ export default function Docs() {
           </div>
         </main>
       </div>
+
+      {/* Edit Note Modal */}
+      <Dialog open={!!editingTopic} onOpenChange={() => setEditingTopic(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Edit Note</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editFormData.title}
+                onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-content">Content (Markdown)</Label>
+              <Textarea
+                id="edit-content"
+                value={editFormData.content}
+                onChange={(e) => setEditFormData({ ...editFormData, content: e.target.value })}
+                rows={12}
+                className="font-mono text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTopic(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={isEditSaving}>
+              {isEditSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ContributeNoteModal
         isOpen={isContributeOpen}

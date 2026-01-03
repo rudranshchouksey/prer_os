@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -11,9 +11,9 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -236,7 +236,7 @@ function SortableApplicationCard({ application }: { application: JobApplication 
   );
 }
 
-// Kanban Column
+// Droppable Kanban Column
 function KanbanColumn({
   status,
   applications,
@@ -244,9 +244,21 @@ function KanbanColumn({
   status: typeof APPLICATION_STATUSES[number];
   applications: JobApplication[];
 }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column-${status.id}`,
+    data: { status: status.id },
+  });
+
   return (
     <div className="flex-shrink-0 w-72">
-      <div className={cn('rounded-xl p-3', status.color)}>
+      <div 
+        ref={setNodeRef}
+        className={cn(
+          'rounded-xl p-3 transition-colors min-h-[300px]',
+          status.color,
+          isOver && 'ring-2 ring-primary ring-offset-2'
+        )}
+      >
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-foreground">{status.label}</h3>
           <Badge variant="secondary" className="text-xs">
@@ -780,24 +792,22 @@ export default function Applications() {
     const activeApp = applications?.find((a) => a.id === active.id);
     if (!activeApp) return;
 
-    // Find which column the item was dropped into
+    // Check if dropped on a column
+    const overId = over.id.toString();
+    if (overId.startsWith('column-')) {
+      const newStatus = overId.replace('column-', '') as ApplicationStatus;
+      if (newStatus !== activeApp.status) {
+        updateApplication.mutate({
+          id: activeApp.id,
+          status: newStatus,
+        });
+      }
+      return;
+    }
+
+    // Dropped on another card - get that card's status
     const overApp = applications?.find((a) => a.id === over.id);
     if (overApp && overApp.status !== activeApp.status) {
-      updateApplication.mutate({
-        id: activeApp.id,
-        status: overApp.status,
-      });
-    }
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeApp = applications?.find((a) => a.id === active.id);
-    const overApp = applications?.find((a) => a.id === over.id);
-
-    if (activeApp && overApp && activeApp.status !== overApp.status) {
       updateApplication.mutate({
         id: activeApp.id,
         status: overApp.status,
@@ -867,10 +877,9 @@ export default function Applications() {
         <ScrollArea className="w-full">
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
           >
             <div className="flex gap-4 pb-4">
               {APPLICATION_STATUSES.map((status) => (
