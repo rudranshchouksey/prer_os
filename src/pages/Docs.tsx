@@ -492,13 +492,13 @@ export default function Docs() {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-background to-muted/20">
-          <div className="max-w-4xl mx-auto p-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-background to-muted/20">
+          <div className="w-full max-w-4xl mx-auto p-8">
             <motion.div
               key={selectedTopic}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="prose prose-lg max-w-none"
+              className="prose prose-lg max-w-none w-full break-words [&_pre]:overflow-x-auto [&_code]:break-words"
             >
               {/* Wiki-style Edit/Delete buttons for user notes */}
               {isUserNote && user && (
