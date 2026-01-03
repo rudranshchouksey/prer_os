@@ -81,7 +81,49 @@ export function useUpdateProgress() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    // Optimistic updates for instant UI feedback
+    onMutate: async ({ questionId, status, confidence }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['user-progress'] });
+
+      // Snapshot previous value
+      const previousProgress = queryClient.getQueryData<UserProgress[]>(['user-progress', user?.id]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData<UserProgress[]>(['user-progress', user?.id], (old) => {
+        if (!old || !user) return old;
+        
+        const existing = old.find(p => p.question_id === questionId);
+        if (existing) {
+          return old.map(p => 
+            p.question_id === questionId 
+              ? { ...p, status, confidence: confidence ?? p.confidence, last_reviewed_at: new Date().toISOString() }
+              : p
+          );
+        }
+        
+        // Add new progress entry
+        return [...old, {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          question_id: questionId,
+          status,
+          confidence: confidence ?? null,
+          last_reviewed_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }];
+      });
+
+      return { previousProgress };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousProgress) {
+        queryClient.setQueryData(['user-progress', user?.id], context.previousProgress);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['user-progress'] });
     }
   });
