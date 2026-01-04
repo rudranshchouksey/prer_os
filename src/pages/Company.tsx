@@ -1,5 +1,6 @@
 import React from 'react';
 import PageLayout from '../layouts/PageLayout';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Mail, MapPin, Users, Heart, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -36,17 +37,28 @@ export function About() {
         {/* Team Section Placeholder */}
         <div className="border-t border-slate-100 pt-20">
           <h2 className="text-3xl font-bold mb-12 text-center">The Team</h2>
-          <div className="flex justify-center gap-8">
+          <div className="flex justify-center gap-10">
+            
+            {/* Rudransh */}
             <div className="text-center">
-              <div className="w-24 h-24 bg-slate-200 rounded-full mb-4 mx-auto" />
-              <div className="font-bold">Rudransh Chouksey</div>
-              <div className="text-sm text-slate-500">Founder & Engineer</div>
+              <Avatar className="w-24 h-24 mb-4 mx-auto border-4 border-white shadow-lg">
+                <AvatarImage src="/rudransh-chouksey.jpg" className="object-cover" />
+                <AvatarFallback className="bg-slate-200 text-xl font-bold text-slate-500">RC</AvatarFallback>
+              </Avatar>
+              <div className="font-bold text-lg">Rudransh Chouksey</div>
+              <div className="text-sm text-slate-500 font-medium">Founder & Engineer</div>
             </div>
-             <div className="text-center">
-              <div className="w-24 h-24 bg-slate-200 rounded-full mb-4 mx-auto" />
-              <div className="font-bold">Shivani Rawat</div>
-              <div className="text-sm text-slate-500">Co-Founder & Design</div>
+
+            {/* Shivani */}
+            <div className="text-center">
+              <Avatar className="w-24 h-24 mb-4 mx-auto border-4 border-white shadow-lg">
+                <AvatarImage src="/shivani-rawat.jpg" className="object-cover" />
+                <AvatarFallback className="bg-slate-200 text-xl font-bold text-slate-500">SR</AvatarFallback>
+              </Avatar>
+              <div className="font-bold text-lg">Shivani Rawat</div>
+              <div className="text-sm text-slate-500 font-medium">Co-Founder & Design</div>
             </div>
+
           </div>
         </div>
       </div>
