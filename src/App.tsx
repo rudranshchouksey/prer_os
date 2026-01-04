@@ -17,6 +17,10 @@ import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
 import Applications from "./pages/Applications";
 import NotFound from "./pages/NotFound";
+import LegalPage from './pages/Legal';
+import Changelog from './pages/Changelog';
+import DocsLanding from './pages/DocsLanding';
+import { About, Contact } from './pages/Company';
 
 const queryClient = new QueryClient();
 
@@ -31,6 +35,18 @@ const App = () => (
           <CommandMenu />
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* Legal Routes */}
+            <Route path="/privacy" element={<LegalPage type="privacy" />} />
+            <Route path="/terms" element={<LegalPage type="terms" />} />
+            <Route path="/security" element={<LegalPage type="security" />} />
+            
+            {/* Company Routes */}
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            
+            {/* Product Routes */}
+            <Route path="/changelog" element={<Changelog />} />
+            <Route path="/doc" element={<DocsLanding />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

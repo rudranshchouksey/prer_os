@@ -1,19 +1,20 @@
-import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo } from 'react';
 import { 
   Plus, 
   GripVertical, 
   Trash2, 
-  Check, 
-  Star, 
-  Clock,
-  ListTodo,
-  Loader2
+  CheckCircle2, 
+  Target, 
+  Sparkles,
+  BookOpen,
+  MoreHorizontal
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { GlassCard } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserTasks, useCreateTask, useUpdateTask, useDeleteTask, UserTask } from '@/hooks/useUserTasks';
@@ -26,15 +27,16 @@ import {
   closestCorners,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  DragOverEvent,
   useDroppable,
+  defaultDropAnimationSideEffects,
+  DropAnimation
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -42,26 +44,28 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
+// --- Types & Config ---
 
 type ColumnType = 'must-do' | 'nice-to-have' | 'applied';
 
-const columns: { id: ColumnType; label: string; icon: React.ElementType; color: string }[] = [
-  { id: 'must-do', label: 'Must Do', icon: Star, color: 'text-destructive' },
-  { id: 'nice-to-have', label: 'Nice to Have', icon: Clock, color: 'text-warning' },
-  { id: 'applied', label: 'Applied', icon: Check, color: 'text-success' }
+const columns: { id: ColumnType; label: string; color: string; bg: string; border: string }[] = [
+  { id: 'must-do', label: 'Priority / Must Do', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+  { id: 'nice-to-have', label: 'Nice to Have', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
+  { id: 'applied', label: 'Completed / Applied', color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' }
 ];
 
-interface SortableTaskCardProps {
-  task: UserTask;
-  onDelete: () => void;
-}
+const SUGGESTIONS = [
+  'System Design: Scalability',
+  'React Hooks Deep Dive',
+  'PostgreSQL Indexing',
+  'Docker & Kubernetes',
+  'GraphQL vs REST',
+  'CI/CD Pipelines'
+];
 
-function SortableTaskCard({ task, onDelete }: SortableTaskCardProps) {
+// --- Components ---
+
+function TaskCard({ task, isOverlay, onDelete }: { task: UserTask; isOverlay?: boolean; onDelete?: () => void }) {
   const {
     attributes,
     listeners,
@@ -69,112 +73,112 @@ function SortableTaskCard({ task, onDelete }: SortableTaskCardProps) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ id: task.id, data: { type: 'Task', task } });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       style={style}
-      layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: isDragging ? 0.5 : 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
       className={cn(
-        "glass rounded-xl p-4 group hover:border-primary/30 transition-all",
-        isDragging && "shadow-lg ring-2 ring-primary/50"
+        "group relative bg-white p-3 rounded-xl border border-slate-200 shadow-sm transition-all touch-none",
+        "hover:border-purple-300 hover:shadow-md",
+        isDragging && "opacity-30 border-dashed border-slate-400 bg-slate-50",
+        isOverlay && "opacity-100 scale-105 shadow-xl ring-2 ring-purple-500 z-50 cursor-grabbing"
       )}
     >
       <div className="flex items-start gap-3">
+        {/* Drag Handle */}
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing touch-none"
+          className="mt-1 text-slate-300 hover:text-slate-600 cursor-grab active:cursor-grabbing"
         >
-          <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1 opacity-50 group-hover:opacity-100 transition-opacity" />
+          <GripVertical className="w-4 h-4" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{task.title}</p>
-          {task.description && (
-            <span className="text-xs text-muted-foreground line-clamp-2">{task.description}</span>
-          )}
-        </div>
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded-lg hover:bg-destructive/20 text-destructive transition-colors opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
 
-function TaskCardOverlay({ task }: { task: UserTask }) {
-  return (
-    <div className="glass rounded-xl p-4 shadow-2xl ring-2 ring-primary">
-      <div className="flex items-start gap-3">
-        <GripVertical className="w-4 h-4 text-primary flex-shrink-0 mt-1" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{task.title}</p>
+          <p className={cn(
+            "text-sm font-medium text-slate-900 leading-tight mb-1",
+            task.category === 'applied' && "line-through text-slate-500"
+          )}>
+            {task.title}
+          </p>
           {task.description && (
-            <span className="text-xs text-muted-foreground">{task.description}</span>
+            <p className="text-xs text-slate-500 line-clamp-1">{task.description}</p>
           )}
+          <div className="flex items-center gap-2 mt-2">
+             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-slate-100 text-slate-500">
+               {task.category === 'must-do' ? 'High Priority' : task.category === 'nice-to-have' ? 'Medium' : 'Done'}
+             </Badge>
+          </div>
         </div>
+
+        {!isOverlay && onDelete && (
+          <button
+            onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-interface DroppableColumnProps {
-  column: typeof columns[number];
-  tasks: UserTask[];
+function KanbanColumn({ 
+  column, 
+  tasks, 
+  onDeleteTask 
+}: { 
+  column: typeof columns[number]; 
+  tasks: UserTask[]; 
   onDeleteTask: (id: string) => void;
-}
-
-function DroppableColumn({ column, tasks, onDeleteTask }: DroppableColumnProps) {
+}) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
+    data: { type: 'Column', column }
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full rounded-2xl bg-slate-50/50 border border-slate-200/60 overflow-hidden">
+      {/* Column Header */}
+      <div className={cn("p-3 border-b border-slate-100 flex items-center justify-between", column.bg)}>
         <div className="flex items-center gap-2">
-          <column.icon className={cn("w-5 h-5", column.color)} />
-          <h2 className="font-semibold">{column.label}</h2>
+          <div className={cn("w-2 h-2 rounded-full", column.color.replace('text-', 'bg-'))} />
+          <h3 className={cn("text-xs font-bold uppercase tracking-wider", column.color)}>
+            {column.label}
+          </h3>
         </div>
-        <span className="text-sm text-muted-foreground font-mono">
+        <Badge variant="secondary" className="bg-white shadow-sm font-mono text-[10px] text-slate-600">
           {tasks.length}
-        </span>
+        </Badge>
       </div>
-      
-      <div
+
+      {/* Sortable Area */}
+      <div 
         ref={setNodeRef}
         className={cn(
-          "space-y-3 min-h-[200px] p-4 rounded-2xl border transition-colors",
-          "bg-dark-800/30 border-border/50",
-          isOver && "bg-primary/5 border-primary/30"
+          "flex-1 p-3 space-y-3 overflow-y-auto min-h-[150px] transition-colors",
+          isOver && "bg-purple-50/50"
         )}
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-              <ListTodo className="w-8 h-8 mb-2 opacity-50" />
-              <p className="text-sm">Drop items here</p>
+          {tasks.map(task => (
+            <TaskCard key={task.id} task={task} onDelete={() => onDeleteTask(task.id)} />
+          ))}
+          {tasks.length === 0 && (
+            <div className="h-24 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center">
+              <p className="text-xs text-slate-400 font-medium">Drop tasks here</p>
             </div>
-          ) : (
-            tasks.map(task => (
-              <SortableTaskCard
-                key={task.id}
-                task={task}
-                onDelete={() => onDeleteTask(task.id)}
-              />
-            ))
           )}
         </SortableContext>
       </div>
@@ -190,226 +194,148 @@ export default function StudyPlan() {
   const deleteTask = useDeleteTask();
   
   const [newItemTitle, setNewItemTitle] = useState('');
-  const [newItemColumn, setNewItemColumn] = useState<ColumnType>('must-do');
   const [activeTask, setActiveTask] = useState<UserTask | null>(null);
 
+  // Sensors optimized for interactions
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleAddItem = () => {
-    if (!newItemTitle.trim()) return;
-    if (!user) {
-      toast.error('Please log in to add items');
-      return;
-    }
+  const handleAddItem = (title = newItemTitle, category: ColumnType = 'must-do') => {
+    if (!title.trim()) return;
+    if (!user) return toast.error('Please log in');
     
-    createTask.mutate({
-      title: newItemTitle.trim(),
-      description: null,
-      category: newItemColumn,
-      due_date: null
-    }, {
+    createTask.mutate({ title: title.trim(), description: null, category, due_date: null }, {
       onSuccess: () => {
         setNewItemTitle('');
-        toast.success('Item added');
-      },
-      onError: () => {
-        toast.error('Failed to add item');
+        toast.success('Task added');
       }
     });
   };
 
-  const handleDeleteTask = (id: string) => {
-    deleteTask.mutate(id, {
-      onSuccess: () => toast.success('Item deleted'),
-      onError: () => toast.error('Failed to delete item')
-    });
-  };
-
-  const getTasksByCategory = (category: ColumnType) => 
-    tasks.filter(task => task.category === category);
-
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const task = tasks.find(t => t.id === active.id);
-    if (task) setActiveTask(task);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    // Handle drag over for visual feedback
+    const task = tasks.find(t => t.id === event.active.id);
+    if (task) {
+        setActiveTask(task);
+        if (navigator.vibrate) navigator.vibrate(10);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveTask(null);
-
     if (!over) return;
 
     const activeTask = tasks.find(t => t.id === active.id);
     if (!activeTask) return;
 
-    // Check if dropped over a column
-    const targetColumn = columns.find(c => c.id === over.id);
-    if (targetColumn && activeTask.category !== targetColumn.id) {
-      updateTask.mutate({
-        id: activeTask.id,
-        category: targetColumn.id
-      });
-      return;
+    // Dropped on a column directly
+    if (columns.some(c => c.id === over.id)) {
+        if (activeTask.category !== over.id) {
+            updateTask.mutate({ id: activeTask.id, category: over.id as ColumnType });
+        }
+        return;
     }
 
-    // Check if dropped over another task
+    // Dropped on another task
     const overTask = tasks.find(t => t.id === over.id);
     if (overTask && overTask.category !== activeTask.category) {
-      updateTask.mutate({
-        id: activeTask.id,
-        category: overTask.category
-      });
+        updateTask.mutate({ id: activeTask.id, category: overTask.category });
     }
   };
 
-  if (!user) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <p className="text-muted-foreground">Please log in to view your study plan.</p>
-        </div>
-      </MainLayout>
-    );
-  }
+  const dropAnimation: DropAnimation = {
+    sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }),
+  };
+
+  // Stats Calculation
+  const progress = useMemo(() => {
+    if (tasks.length === 0) return 0;
+    const completed = tasks.filter(t => t.category === 'applied').length;
+    return Math.round((completed / tasks.length) * 100);
+  }, [tasks]);
 
   return (
     <MainLayout>
-      <motion.div
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        className="space-y-8"
-      >
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl lg:text-4xl font-bold gradient-text mb-2">
-            Study Plan
-          </h1>
-          <p className="text-muted-foreground">
-            Drag and drop to organize your learning roadmap
-          </p>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-[1600px] mx-auto p-4 md:p-6 pb-20">
+        
+        {/* Header & Stats */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-6">
+          <div>
+            <h1 className="text-3xl font-serif font-bold text-slate-900 mb-2">Study Roadmap</h1>
+            <p className="text-slate-500">Organize your preparation strategy.</p>
+          </div>
+          <div className="w-full md:w-64 space-y-2">
+            <div className="flex justify-between text-xs font-medium text-slate-600">
+                <span>Completion</span>
+                <span>{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
         </div>
 
-        {/* Add New Item */}
-        <GlassCard className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <Input
-              placeholder="Add a new study item..."
-              value={newItemTitle}
-              onChange={(e) => setNewItemTitle(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
-              className="bg-dark-800 border-border"
-            />
-          </div>
-          <div className="flex gap-2">
-            {columns.map(col => (
-              <button
-                key={col.id}
-                onClick={() => setNewItemColumn(col.id)}
-                className={cn(
-                  "p-2 rounded-lg border transition-all",
-                  newItemColumn === col.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-muted-foreground"
-                )}
-                title={col.label}
-              >
-                <col.icon className={cn("w-4 h-4", col.color)} />
-              </button>
-            ))}
-          </div>
-          <Button 
-            onClick={handleAddItem} 
-            className="gap-2"
-            disabled={createTask.isPending}
-          >
-            {createTask.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Plus className="w-4 h-4" />
-            )}
-            Add
-          </Button>
-        </GlassCard>
+        {/* Input & Suggestions Area */}
+        <div className="space-y-4">
+            <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Target className="h-5 w-5 text-slate-400 group-focus-within:text-purple-600 transition-colors" />
+                </div>
+                <Input
+                    placeholder="Add a new topic to study..."
+                    value={newItemTitle}
+                    onChange={(e) => setNewItemTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+                    className="pl-11 h-12 bg-white border-slate-200 shadow-sm text-base focus-visible:ring-purple-500"
+                />
+                <div className="absolute inset-y-0 right-1.5 flex items-center">
+                    <Button size="sm" onClick={() => handleAddItem()} disabled={createTask.isPending} className="h-9 bg-slate-900 text-white hover:bg-slate-800">
+                        <Plus className="w-4 h-4 mr-1" /> Add
+                    </Button>
+                </div>
+            </div>
 
-        {/* Kanban Board with Drag and Drop */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <DndContext
+            {/* Quick Suggestions Chips */}
+            <div className="flex flex-wrap gap-2">
+                <span className="flex items-center text-xs font-semibold text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                    <Sparkles className="w-3 h-3 mr-1 text-purple-500" /> Recommended:
+                </span>
+                {SUGGESTIONS.map(suggestion => (
+                    <button
+                        key={suggestion}
+                        onClick={() => handleAddItem(suggestion, 'must-do')}
+                        className="text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full hover:border-purple-300 hover:text-purple-700 hover:bg-purple-50 transition-all"
+                    >
+                        + {suggestion}
+                    </button>
+                ))}
+            </div>
+        </div>
+
+        {/* Kanban Board */}
+        <DndContext
             sensors={sensors}
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {columns.map(column => (
-                <DroppableColumn
-                  key={column.id}
-                  column={column}
-                  tasks={getTasksByCategory(column.id)}
-                  onDeleteTask={handleDeleteTask}
-                />
-              ))}
+        >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-[500px]">
+                {columns.map(col => (
+                    <KanbanColumn
+                        key={col.id}
+                        column={col}
+                        tasks={tasks.filter(t => t.category === col.id)}
+                        onDeleteTask={(id) => deleteTask.mutate(id)}
+                    />
+                ))}
             </div>
             
-            <DragOverlay>
-              {activeTask ? <TaskCardOverlay task={activeTask} /> : null}
+            <DragOverlay dropAnimation={dropAnimation}>
+                {activeTask ? <TaskCard task={activeTask} isOverlay /> : null}
             </DragOverlay>
-          </DndContext>
-        )}
+        </DndContext>
 
-        {/* Quick Add Suggestions */}
-        <GlassCard>
-          <h3 className="text-lg font-semibold mb-4">Quick Add from Tech Vault</h3>
-          <div className="flex flex-wrap gap-2">
-            {[
-              'Event-Driven Architecture',
-              'Docker Containerization',
-              'OAuth 2.0 Flow',
-              'React Performance',
-              'Prisma Relations',
-              'Kubernetes Basics'
-            ].map(suggestion => (
-              <button
-                key={suggestion}
-                onClick={() => {
-                  if (!user) {
-                    toast.error('Please log in to add items');
-                    return;
-                  }
-                  createTask.mutate({
-                    title: suggestion,
-                    description: 'From Tech Vault',
-                    category: 'must-do',
-                    due_date: null
-                  });
-                }}
-                className="px-3 py-1.5 rounded-lg text-sm bg-muted hover:bg-muted/80 transition-colors"
-              >
-                + {suggestion}
-              </button>
-            ))}
-          </div>
-        </GlassCard>
       </motion.div>
     </MainLayout>
   );

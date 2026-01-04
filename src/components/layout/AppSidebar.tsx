@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -13,6 +13,8 @@ import {
   FileText,
   Briefcase,
   Search,
+  Settings,
+  MoreVertical
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -20,15 +22,22 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { CommandMenu } from '@/components/CommandMenu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu';
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/study-plan', label: 'Study Plan', icon: Calendar },
-  { path: '/docs', label: 'Docs', icon: FileText },
-  { path: '/notes', label: 'Study Notes', icon: BookOpen },
-  { path: '/questions', label: 'Interview Ready', icon: MessageSquareText },
+  { path: '/study-plan', label: 'Roadmap', icon: Calendar },
+  { path: '/questions', label: 'Practice', icon: MessageSquareText },
   { path: '/applications', label: 'Applications', icon: Briefcase },
-  { path: '/profile', label: 'Profile', icon: User },
+  { path: '/docs', label: 'Docs', icon: FileText },
+  { path: '/notes', label: 'Notes', icon: BookOpen },
 ];
 
 export function AppSidebar() {
@@ -49,140 +58,161 @@ export function AppSidebar() {
   };
 
   return (
-    <motion.aside
-      initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className={cn(
-        "fixed left-0 top-0 h-screen z-50 flex flex-col",
-        "glass-sidebar",
-        "transition-all duration-300 ease-in-out",
-        collapsed ? "w-20" : "w-64"
-      )}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-3 p-6 border-b border-sidebar-border">
-        <div className="relative flex-shrink-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-soft">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
+    <>
+      {/* 1. THE VISUAL SIDEBAR (Fixed Position) */}
+      <motion.aside
+        initial={false}
+        animate={{ 
+          width: collapsed ? 80 : 280,
+          transition: { type: "spring", stiffness: 300, damping: 30 }
+        }}
+        className={cn(
+          // Fixed position keeps it pinned while user scrolls content
+          "fixed left-0 top-0 h-screen z-50 flex flex-col",
+          "bg-white/80 backdrop-blur-xl border-r border-slate-200/60 shadow-[4px_0_24px_rgba(0,0,0,0.02)]",
+          // Hide on mobile (we will handle mobile menu separately or via media queries if needed)
+          "hidden md:flex" 
+        )}
+      >
+        {/* Logo */}
+        <div className="h-20 flex items-center px-6">
+          <div className="flex items-center gap-3 w-full">
+            <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            
+            <AnimatePresence>
+              {!collapsed && (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  className="flex flex-col overflow-hidden whitespace-nowrap"
+                >
+                  <span className="font-serif font-bold text-xl text-slate-900 tracking-tight">PrepOS</span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Interview OS</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-        {!collapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <h1 className="text-xl font-serif font-bold text-foreground">PrepOS</h1>
-            <p className="text-xs text-muted-foreground">Interview Prep</p>
-          </motion.div>
-        )}
-      </div>
 
-      {/* Search Button */}
-      <div className="px-4 pt-4">
-        <Button
-          variant="outline"
-          onClick={() => setCommandOpen(true)}
-          className={cn(
-            "w-full justify-start text-muted-foreground bg-muted/50 hover:bg-muted border-border",
-            collapsed && "justify-center px-0"
-          )}
-        >
-          <Search className="w-4 h-4" />
-          {!collapsed && (
-            <>
-              <span className="ml-2 flex-1 text-left">Search...</span>
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                <span className="text-xs">⌘</span>K
-              </kbd>
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link key={item.path} to={item.path}>
-              <motion.div
-                whileHover={{ x: 4 }}
-                whileTap={{ scale: 0.98 }}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
-                  "group relative overflow-hidden",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
-                )}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNav"
-                    className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
-                <item.icon className={cn(
-                  "w-5 h-5 transition-colors",
-                  isActive && "text-primary"
-                )} />
-                {!collapsed && (
-                  <span className="font-medium text-sm">{item.label}</span>
-                )}
-              </motion.div>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* User section with Logout */}
-      <div className="p-4 border-t border-sidebar-border space-y-2">
-        {user && !collapsed && (
-          <div className="flex items-center gap-3 px-2 mb-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-primary-foreground text-sm font-medium">
-              {user.email?.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-sm text-muted-foreground truncate">
-              {user.email}
-            </span>
-          </div>
-        )}
-        {user && (
+        {/* Search */}
+        <div className="px-4 mb-6">
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
+            variant="outline"
+            onClick={() => setCommandOpen(true)}
             className={cn(
-              "w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10",
-              collapsed && "justify-center"
+              "w-full h-10 bg-slate-50/50 hover:bg-slate-100 border-slate-200 text-slate-500 shadow-sm transition-all",
+              collapsed ? "px-0 justify-center aspect-square" : "justify-between px-3"
             )}
           >
-            <LogOut className="w-4 h-4" />
-            {!collapsed && <span className="ml-2">Log out</span>}
+            <div className="flex items-center gap-2">
+              <Search className="w-4 h-4" />
+              {!collapsed && <span className="text-sm font-medium">Search</span>}
+            </div>
+            {!collapsed && (
+              <kbd className="hidden lg:inline-flex h-5 items-center gap-1 rounded border border-slate-200 bg-white px-1.5 font-mono text-[10px] font-medium text-slate-400">
+                ⌘K
+              </kbd>
+            )}
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full justify-center text-muted-foreground"
-        >
-          {collapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span className="ml-1 text-xs">Collapse</span>
-            </>
-          )}
-        </Button>
-      </div>
+        </div>
 
-      {/* Command Menu */}
+        {/* Nav Links */}
+        <div className="flex-1 overflow-y-auto px-3 py-2 scrollbar-none">
+          <nav className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              const Icon = item.icon;
+              return (
+                <Link key={item.path} to={item.path}>
+                  <div className={cn(
+                      "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                      isActive 
+                        ? "bg-slate-900 text-white shadow-md shadow-slate-900/10" 
+                        : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                      collapsed && "justify-center px-0"
+                    )}
+                  >
+                    <Icon className={cn(
+                      "w-5 h-5 flex-shrink-0 transition-transform duration-200",
+                      isActive ? "text-white" : "text-slate-500 group-hover:text-slate-900",
+                      !collapsed && "group-hover:scale-110"
+                    )} />
+                    {!collapsed && <span className="font-medium text-sm flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>}
+                    {collapsed && (
+                      <div className="absolute left-full ml-4 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                        {item.label}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Footer / User */}
+        <div className="p-3 mt-auto border-t border-slate-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={cn(
+                "w-full flex items-center gap-3 p-2 rounded-xl transition-all duration-200 outline-none",
+                "hover:bg-slate-100/80 active:scale-[0.98]",
+                collapsed ? "justify-center" : "bg-white border border-slate-200 shadow-sm"
+              )}>
+                <Avatar className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50">
+                  <AvatarImage src="" />
+                  <AvatarFallback className="bg-indigo-50 text-indigo-600 font-bold rounded-lg text-xs">
+                    {user?.email?.[0].toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                {!collapsed && (
+                  <>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{user?.email?.split('@')[0]}</p>
+                      <p className="text-[10px] text-slate-500 truncate">Pro Account</p>
+                    </div>
+                    <MoreVertical className="w-4 h-4 text-slate-400" />
+                  </>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="right" className="w-56 mb-2 ml-2" sideOffset={10}>
+              <DropdownMenuItem onClick={() => navigate('/profile')}><User className="w-4 h-4 mr-2" /> Profile</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600"><LogOut className="w-4 h-4 mr-2" /> Log out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full mt-2 h-6 text-slate-400 hover:text-slate-600 hover:bg-transparent"
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </Button>
+        </div>
+      </motion.aside>
+
+      {/* 2. THE SPACER (Layout Driver)
+        This invisible div animates its width exactly like the sidebar.
+        Since MainLayout is display:flex, this spacer will physically push the <main> content
+        to the right, creating the "content moving with sidebar" effect.
+      */}
+      <motion.div 
+        animate={{ 
+          width: collapsed ? 80 : 280,
+          transition: { type: "spring", stiffness: 300, damping: 30 }
+        }}
+        className="flex-shrink-0 hidden md:block relative z-0" 
+      />
+
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
-    </motion.aside>
+    </>
   );
 }

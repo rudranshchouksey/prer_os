@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export interface UserProgress {
   id: string;
@@ -49,14 +50,18 @@ export function useUpdateProgress() {
     }) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data: existing } = await supabase
+      // 1. Manually check if the row exists
+      const { data: existing, error: fetchError } = await supabase
         .from('user_progress')
         .select('id')
         .eq('user_id', user.id)
         .eq('question_id', questionId)
         .maybeSingle();
 
+      if (fetchError) throw fetchError;
+
       if (existing) {
+        // 2a. Update existing
         const { error } = await supabase
           .from('user_progress')
           .update({ 
@@ -68,6 +73,7 @@ export function useUpdateProgress() {
 
         if (error) throw error;
       } else {
+        // 2b. Insert new
         const { error } = await supabase
           .from('user_progress')
           .insert({
@@ -81,19 +87,15 @@ export function useUpdateProgress() {
         if (error) throw error;
       }
     },
-    // Optimistic updates for instant UI feedback
+    // Optimistic Update
     onMutate: async ({ questionId, status, confidence }) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['user-progress'] });
-
-      // Snapshot previous value
       const previousProgress = queryClient.getQueryData<UserProgress[]>(['user-progress', user?.id]);
 
-      // Optimistically update the cache
       queryClient.setQueryData<UserProgress[]>(['user-progress', user?.id], (old) => {
-        if (!old || !user) return old;
-        
+        if (!old) return [];
         const existing = old.find(p => p.question_id === questionId);
+        
         if (existing) {
           return old.map(p => 
             p.question_id === questionId 
@@ -102,9 +104,8 @@ export function useUpdateProgress() {
           );
         }
         
-        // Add new progress entry
         return [...old, {
-          id: crypto.randomUUID(),
+          id: 'temp-id',
           user_id: user.id,
           question_id: questionId,
           status,
@@ -118,15 +119,15 @@ export function useUpdateProgress() {
       return { previousProgress };
     },
     onError: (err, variables, context) => {
-      // Rollback on error
+      console.error("Supabase Error:", err);
+      toast.error("Failed to save progress");
       if (context?.previousProgress) {
         queryClient.setQueryData(['user-progress', user?.id], context.previousProgress);
       }
     },
     onSettled: () => {
-      // Invalidate all user-progress queries to sync Dashboard
       queryClient.invalidateQueries({ queryKey: ['user-progress'] });
-      queryClient.invalidateQueries({ queryKey: ['all-questions-count'] });
+      queryClient.invalidateQueries({ queryKey: ['study-modules'] });
     }
   });
 }
@@ -167,3 +168,4 @@ export function useProgressStats() {
     percentComplete: totalQuestions > 0 ? Math.round((mastered / totalQuestions) * 100) : 0
   };
 }
+
