@@ -9,12 +9,15 @@ interface MainLayoutProps {
 
 export function MainLayout({ children, className }: MainLayoutProps) {
   return (
-    <div className="flex min-h-screen w-full bg-[#f8f9fa] relative text-slate-900 font-sans">
+    // FIX: Changed 'flex' to 'flex flex-col md:flex-row'
+    // This ensures vertical stacking on mobile (Header -> Content)
+    // and horizontal stacking on desktop (Sidebar -> Content)
+    <div className="flex flex-col md:flex-row min-h-screen w-full bg-[#f8f9fa] relative text-slate-900 font-sans">
       
       {/* Subtle Background Texture */}
       <div className="fixed inset-0 z-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]" />
 
-      {/* Sidebar (Includes the hidden spacer for desktop layout) */}
+      {/* Sidebar / Header */}
       <AppSidebar />
       
       {/* Main Content Area */}
@@ -24,11 +27,7 @@ export function MainLayout({ children, className }: MainLayoutProps) {
           className
         )}
       >
-        {/* Inner Container:
-           1. Handles responsive padding (tight on mobile, spacious on desktop)
-           2. Centers content on ultra-wide screens
-           3. Ensures full height for flex children
-        */}
+        {/* Inner Container */}
         <div className="flex-1 w-full h-full p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto">
           {children}
         </div>

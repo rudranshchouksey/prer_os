@@ -7,6 +7,7 @@ export interface UserSettings {
   user_id: string;
   interview_date: string | null;
   daily_streak: number;
+  full_name?: string;
   last_activity_date: string | null;
   interested_categories: string[] | null;
   onboarding_completed: boolean;

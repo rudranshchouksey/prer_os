@@ -6,12 +6,16 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { CommandMenu } from "@/components/CommandMenu";
+
+// Pages
 import Landing from "./pages/Landing";
+import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import StudyPlan from "./pages/StudyPlan";
 import StudyNotes from "./pages/StudyNotes";
-import InterviewReady from "./pages/InterviewReady";
+import InterviewReady from "./pages/InterviewReady"; // Now Personal Questions
+import Practice from "./pages/Practice"; // New Global Questions
 import Docs from "./pages/Docs";
 import Profile from "./pages/Profile";
 import Onboarding from "./pages/Onboarding";
@@ -35,6 +39,7 @@ const App = () => (
           <CommandMenu />
           <Routes>
             <Route path="/" element={<Landing />} />
+            
             {/* Legal Routes */}
             <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/terms" element={<LegalPage type="terms" />} />
@@ -48,14 +53,24 @@ const App = () => (
             <Route path="/changelog" element={<Changelog />} />
             <Route path="/doc" element={<DocsLanding />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Protected App Routes */}
             <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
+            
+            {/* Split Knowledge Base */}
             <Route path="/docs" element={<ProtectedRoute><Docs /></ProtectedRoute>} />
             <Route path="/notes" element={<ProtectedRoute><StudyNotes /></ProtectedRoute>} />
-            <Route path="/questions" element={<ProtectedRoute><InterviewReady /></ProtectedRoute>} />
+            
+            {/* Split Practice */}
+            <Route path="/questions" element={<ProtectedRoute><InterviewReady /></ProtectedRoute>} /> {/* Personal */}
+            <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} /> {/* Global */}
+            
             <Route path="/applications" element={<ProtectedRoute><Applications /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

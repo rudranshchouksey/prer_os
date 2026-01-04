@@ -4,58 +4,34 @@ import { cn } from '@/lib/utils';
 interface AnimatedProgressProps {
   value: number;
   max?: number;
-  label?: string;
-  showPercentage?: boolean;
-  color?: 'blue' | 'purple' | 'green';
+  className?: string;
+  barClassName?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
-export function AnimatedProgress({
-  value,
-  max = 100,
-  label,
-  showPercentage = true,
-  color = 'blue',
+export function AnimatedProgress({ 
+  value, 
+  max = 100, 
+  className, 
+  barClassName,
   size = 'md'
 }: AnimatedProgressProps) {
-  const percentage = Math.min((value / max) * 100, 100);
-  
-  const colorClasses = {
-    blue: 'from-primary to-primary/70',
-    purple: 'from-secondary to-secondary/70',
-    green: 'from-success to-success/70'
-  };
-  
-  const sizeClasses = {
+  const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
+
+  const heights = {
     sm: 'h-1.5',
     md: 'h-2.5',
     lg: 'h-4'
   };
 
   return (
-    <div className="space-y-2">
-      {(label || showPercentage) && (
-        <div className="flex justify-between text-sm">
-          {label && <span className="text-muted-foreground">{label}</span>}
-          {showPercentage && (
-            <span className="font-mono text-foreground">{Math.round(percentage)}%</span>
-          )}
-        </div>
-      )}
-      <div className={cn(
-        "w-full bg-muted rounded-full overflow-hidden",
-        sizeClasses[size]
-      )}>
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${percentage}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className={cn(
-            "h-full rounded-full bg-gradient-to-r",
-            colorClasses[color]
-          )}
-        />
-      </div>
+    <div className={cn("w-full bg-slate-100 rounded-full overflow-hidden", heights[size], className)}>
+      <motion.div
+        className={cn("h-full bg-slate-900 rounded-full", barClassName)}
+        initial={{ width: 0 }}
+        animate={{ width: `${percentage}%` }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion'; // Added Variants type import
 import {
   Brain,
   Target,
@@ -11,7 +11,9 @@ import {
   TrendingUp,
   Clock,
   MoreHorizontal,
-  Bell
+  Bell,
+  MessageSquareText,
+  FileText
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -27,11 +29,10 @@ import {
   useUserSettings,
   useTrackActivity
 } from '@/hooks/useUserSettings';
-import {
-  useUserProgress,
-} from '@/hooks/useUserProgress';
+import { useUserProgress } from '@/hooks/useUserProgress';
 import { useStudyModules } from '@/hooks/useStudyModules';
-import { Badge } from '@/components/ui/badge';
+import { useUserQuestions } from '@/hooks/useUserQuestions'; 
+import { useUserNotes } from '@/hooks/useUserNotes';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// --- 1. STRICT INTERFACES (Fixes "Element implicitly has any type" errors) ---
+// --- Interfaces ---
 
 interface CategoryStat {
   total: number;
@@ -47,7 +48,6 @@ interface CategoryStat {
   review: number;
 }
 
-// These match the data shape from your hooks
 interface Question {
   id: string;
 }
@@ -68,13 +68,13 @@ interface StatCardProps {
   icon: React.ReactNode;
   label: string;
   value: number;
-  trend: 'up' | 'down' | 'neutral';
-  color: 'purple' | 'green' | 'amber' | 'blue';
+  trend?: 'up' | 'down' | 'neutral';
+  color: 'purple' | 'green' | 'amber' | 'blue' | 'indigo';
   mobileCompact?: boolean;
 }
 
-// --- Animation Variants ---
-const containerVariants = {
+// --- Animation Variants (FIXED WITH TYPES) ---
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -82,7 +82,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
@@ -101,8 +101,12 @@ export default function Dashboard() {
 
   const { data: settings } = useUserSettings();
   const { trackActivity } = useTrackActivity();
+  
+  // Data Hooks
   const { data: userProgress } = useUserProgress();
   const { data: studyModules } = useStudyModules();
+  const { data: personalQuestions } = useUserQuestions();
+  const { data: personalNotes } = useUserNotes();
 
   const [showDateInput, setShowDateInput] = useState(false);
 
@@ -111,21 +115,20 @@ export default function Dashboard() {
     incrementStreak();
   }, [trackActivity, incrementStreak]);
 
-  // --- Strict Stats Calculation ---
+  // --- Stats Calculation ---
   const stats = useMemo(() => {
-    // 2. SAFE CASTING (Fixes "Object is potentially undefined")
     const safeModules = (studyModules || []) as unknown as Module[];
     const safeProgress = (userProgress || []) as unknown as Progress[];
 
-    const totalQuestions = safeModules.reduce((acc, m) => acc + (m.questions?.length || 0), 0);
+    const totalGlobalQuestions = safeModules.reduce((acc, m) => acc + (m.questions?.length || 0), 0);
     const masteredQuestions = safeProgress.filter(p => p.status === 'Mastered').length;
     const reviewQuestions = safeProgress.filter(p => p.status === 'Review').length;
-    const newQuestions = Math.max(0, totalQuestions - masteredQuestions - reviewQuestions);
+    
+    const totalPersonalQuestions = personalQuestions?.length || 0;
+    const totalNotes = personalNotes?.length || 0;
 
-    // Cast JSONB to string array
     const userCategories = (settings?.interested_categories as unknown as string[]) || [];
 
-    // 3. TYPED REDUCE ACCUMULATOR (Fixes "No index signature" error)
     const categoryProgress = safeModules.reduce<Record<string, CategoryStat>>((acc, module) => {
       const cat = module.category || 'General';
 
@@ -139,7 +142,6 @@ export default function Dashboard() {
         if (!isInterested) return acc;
       }
 
-      // Initialize if missing
       if (!acc[cat]) {
         acc[cat] = { total: 0, mastered: 0, review: 0 };
       }
@@ -156,14 +158,14 @@ export default function Dashboard() {
     }, {});
 
     return {
-      totalQuestions,
+      totalGlobalQuestions,
       masteredQuestions,
       reviewQuestions,
-      newQuestions,
-      progressPercent: totalQuestions > 0 ? Math.round((masteredQuestions / totalQuestions) * 100) : 0,
+      totalPersonalQuestions,
+      totalNotes,
       categoryProgress
     };
-  }, [studyModules, userProgress, settings?.interested_categories]);
+  }, [studyModules, userProgress, settings?.interested_categories, personalQuestions, personalNotes]);
 
   const handleDateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -174,8 +176,6 @@ export default function Dashboard() {
       setShowDateInput(false);
     }
   };
-
-  const userInterests = (settings?.interested_categories as unknown as string[]) || [];
 
   return (
     <MainLayout className="bg-gray-50/50">
@@ -189,11 +189,11 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between pb-4 border-b border-gray-200">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
-              Welcome back, <span className="text-purple-600">Developer</span>
+              Welcome back, <span className="text-indigo-600">{settings?.full_name?.split(' ')[0] || 'Developer'}</span>
             </h1>
             <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"/>
-              System operational.
+              System operational. Ready for prep.
             </p>
           </div>
 
@@ -223,17 +223,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
 
           {/* Stats Overview */}
-          <motion.div variants={itemVariants} className="md:col-span-12 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+          <motion.div variants={itemVariants} className="md:col-span-12 grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-6">
              <StatCard
-               icon={<Brain className="w-5 h-5 text-purple-600" />}
-               label="Total"
-               value={stats.totalQuestions}
-               trend="neutral"
-               color="purple"
-               mobileCompact
-             />
-             <StatCard
-               icon={<CheckCircle2 className="w-5 h-5 text-green-600" />}
+               icon={<Target className="w-5 h-5 text-green-600" />}
                label="Mastered"
                value={stats.masteredQuestions}
                trend="up"
@@ -241,19 +233,32 @@ export default function Dashboard() {
                mobileCompact
              />
              <StatCard
-               icon={<Target className="w-5 h-5 text-amber-500" />}
-               label="Review"
+               icon={<Brain className="w-5 h-5 text-amber-500" />}
+               label="To Review"
                value={stats.reviewQuestions}
                trend="neutral"
                color="amber"
                mobileCompact
              />
              <StatCard
-               icon={<BookOpen className="w-5 h-5 text-blue-500" />}
-               label="New"
-               value={stats.newQuestions}
-               trend="neutral"
+               icon={<MessageSquareText className="w-5 h-5 text-indigo-500" />}
+               label="My Questions"
+               value={stats.totalPersonalQuestions}
+               color="indigo"
+               mobileCompact
+             />
+             <StatCard
+               icon={<FileText className="w-5 h-5 text-blue-500" />}
+               label="Study Notes"
+               value={stats.totalNotes}
                color="blue"
+               mobileCompact
+             />
+             <StatCard
+               icon={<Zap className="w-5 h-5 text-purple-500" />}
+               label="Global Qs"
+               value={stats.totalGlobalQuestions}
+               color="purple"
                mobileCompact
              />
           </motion.div>
@@ -300,11 +305,11 @@ export default function Dashboard() {
                 </div>
               ))}
 
-              <Link to="/questions" className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center text-center hover:bg-white hover:border-purple-300 transition-all cursor-pointer min-h-[140px]">
+              <Link to="/practice" className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center text-center hover:bg-white hover:border-purple-300 transition-all cursor-pointer min-h-[140px]">
                 <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center mb-2 shadow-sm group-hover:border-purple-200">
                   <MoreHorizontal className="w-5 h-5 text-gray-400 group-hover:text-purple-500" />
                 </div>
-                <span className="text-sm font-medium text-gray-600 group-hover:text-purple-700">View All Categories</span>
+                <span className="text-sm font-medium text-gray-600 group-hover:text-purple-700">Explore All Topics</span>
               </Link>
             </motion.div>
           </div>
@@ -319,9 +324,9 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 text-gray-700">
                     <Clock className="w-5 h-5 text-purple-600" />
-                    <span className="text-sm font-bold uppercase tracking-wider">Target</span>
+                    <span className="text-sm font-bold uppercase tracking-wider">Target Date</span>
                   </div>
-                  <button onClick={() => setShowDateInput(!showDateInput)} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">
+                  <button onClick={() => setShowDateInput(!showDateInput)} className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 hover:bg-gray-200 transition-colors">
                     {showDateInput ? 'Cancel' : 'Edit'}
                   </button>
                 </div>
@@ -352,30 +357,45 @@ export default function Dashboard() {
             <motion.div variants={itemVariants} className="space-y-3">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Quick Access</h3>
 
-              <Link to="/questions" className="block">
+              <Link to="/practice" className="block">
                 <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-purple-300 transition-all group active:scale-[0.98]">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                       <Zap className="w-5 h-5 text-purple-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">Practice Mode</h4>
-                      <p className="text-xs text-gray-500">Start mock session</p>
+                      <h4 className="font-semibold text-gray-900 text-sm">Global Practice</h4>
+                      <p className="text-xs text-gray-500">Mock questions & answers</p>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-purple-600" />
                 </div>
               </Link>
 
-              <Link to="/docs" className="block">
+              <Link to="/questions" className="block">
+                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-indigo-300 transition-all group active:scale-[0.98]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                      <MessageSquareText className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm">My Question Bank</h4>
+                      <p className="text-xs text-gray-500">Review your personal list</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-600" />
+                </div>
+              </Link>
+              
+              <Link to="/notes" className="block">
                 <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-blue-300 transition-all group active:scale-[0.98]">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <BookOpen className="w-5 h-5 text-blue-600" />
+                      <FileText className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">Knowledge Base</h4>
-                      <p className="text-xs text-gray-500">Review notes</p>
+                      <h4 className="font-semibold text-gray-900 text-sm">Study Notes</h4>
+                      <p className="text-xs text-gray-500">Your knowledge base</p>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-600" />
@@ -383,17 +403,16 @@ export default function Dashboard() {
               </Link>
             </motion.div>
 
-            {/* Recent Activity List */}
+            {/* Recent Progress */}
             <motion.div variants={itemVariants} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 text-sm">Recent Activity</h3>
-                <Link to="/questions" className="text-xs text-purple-600 font-medium">View All</Link>
+                <h3 className="font-semibold text-gray-900 text-sm">Recent Progress</h3>
+                <Link to="/practice" className="text-xs text-purple-600 font-medium">View All</Link>
               </div>
 
               <div className="space-y-4 relative">
                 <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-100" />
                 
-                {/* 4. SAFE MAPPING (Fixes "Cannot read properties of undefined") */}
                 {(userProgress || []).length > 0 ? (
                   ((userProgress || []) as unknown as Progress[])
                     .filter(p => p.last_reviewed_at)
@@ -412,7 +431,6 @@ export default function Dashboard() {
                              progress.status === 'Mastered' ? "bg-green-500" : "bg-amber-400"
                            )} />
                            <div className="flex-1 min-w-0">
-                             {/* Safe optional chaining for question text */}
                              <p className="text-xs font-medium text-gray-900 truncate">{(question as any).question_text || "Unknown Question"}</p>
                              <div className="flex items-center gap-2 mt-0.5">
                                <span className="text-[10px] text-gray-400">
@@ -443,6 +461,7 @@ function StatCard({ icon, label, value, trend, color, mobileCompact }: StatCardP
     green: "bg-green-50 text-green-600",
     amber: "bg-amber-50 text-amber-600",
     blue: "bg-blue-50 text-blue-600",
+    indigo: "bg-indigo-50 text-indigo-600",
   }[color];
 
   return (
