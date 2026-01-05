@@ -1,19 +1,9 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { motion, Variants } from 'framer-motion'; // Added Variants type import
+import { motion, Variants } from 'framer-motion';
 import {
-  Brain,
-  Target,
-  BookOpen,
-  Zap,
-  ArrowRight,
-  Settings,
-  CheckCircle2,
-  TrendingUp,
-  Clock,
-  MoreHorizontal,
-  Bell,
-  MessageSquareText,
-  FileText
+  Brain, Target, BookOpen, Zap, ArrowRight, Settings,
+  CheckCircle2, TrendingUp, Clock, MoreHorizontal, Bell,
+  MessageSquareText, FileText, Lock, Globe, Check
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -25,23 +15,18 @@ import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { useStore } from '@/store/useStore';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import {
-  useUserSettings,
-  useTrackActivity
-} from '@/hooks/useUserSettings';
+import { useUserSettings, useTrackActivity } from '@/hooks/useUserSettings';
 import { useUserProgress } from '@/hooks/useUserProgress';
 import { useStudyModules } from '@/hooks/useStudyModules';
 import { useUserQuestions } from '@/hooks/useUserQuestions'; 
 import { useUserNotes } from '@/hooks/useUserNotes';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuLabel, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // --- Interfaces ---
-
 interface CategoryStat {
   total: number;
   mastered: number;
@@ -50,6 +35,7 @@ interface CategoryStat {
 
 interface Question {
   id: string;
+  question_text?: string;
 }
 
 interface Module {
@@ -73,7 +59,14 @@ interface StatCardProps {
   mobileCompact?: boolean;
 }
 
-// --- Animation Variants (FIXED WITH TYPES) ---
+// --- Mock Notifications Data (Ideally fetch from DB) ---
+const INITIAL_NOTIFICATIONS = [
+  { id: 1, title: 'Keep it up!', message: 'You are on a 3-day streak. 🔥', time: '2 hours ago', read: false },
+  { id: 2, title: 'New Topic', message: 'System Design questions added.', time: '5 hours ago', read: false },
+  { id: 3, title: 'Welcome', message: 'Thanks for joining PrepOS!', time: '1 day ago', read: true },
+];
+
+// --- Animation Variants ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -92,13 +85,7 @@ const itemVariants: Variants = {
 };
 
 export default function Dashboard() {
-  const {
-    dailyStreak,
-    interviewDate,
-    setInterviewDate,
-    incrementStreak
-  } = useStore();
-
+  const { dailyStreak, interviewDate, setInterviewDate, incrementStreak } = useStore();
   const { data: settings } = useUserSettings();
   const { trackActivity } = useTrackActivity();
   
@@ -109,6 +96,10 @@ export default function Dashboard() {
   const { data: personalNotes } = useUserNotes();
 
   const [showDateInput, setShowDateInput] = useState(false);
+  
+  // Notification State
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
     trackActivity();
@@ -177,6 +168,14 @@ export default function Dashboard() {
     }
   };
 
+  const markAllRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const markRead = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
   return (
     <MainLayout className="bg-gray-50/50">
       <motion.div
@@ -199,9 +198,58 @@ export default function Dashboard() {
 
           <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700">
-                <Bell className="w-5 h-5" />
-              </Button>
+              
+              {/* NOTIFICATIONS DROPDOWN */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 relative">
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white animate-pulse" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 p-0">
+                  <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-lg">
+                    <h4 className="font-semibold text-sm">Notifications</h4>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <ScrollArea className="h-[300px]">
+                    <div className="flex flex-col">
+                      {notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => markRead(n.id)}
+                          className={cn(
+                            "flex items-start gap-3 p-4 text-left transition-colors border-b border-gray-50 last:border-0 hover:bg-gray-50",
+                            n.read ? "bg-white" : "bg-blue-50/30"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-2 h-2 mt-1.5 rounded-full shrink-0",
+                            n.read ? "bg-gray-200" : "bg-indigo-500"
+                          )} />
+                          <div>
+                            <p className={cn("text-sm font-medium", n.read ? "text-gray-700" : "text-gray-900")}>
+                              {n.title}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                            <span className="text-[10px] text-gray-400 mt-1 block">{n.time}</span>
+                          </div>
+                        </button>
+                      ))}
+                      {notifications.length === 0 && (
+                         <div className="p-8 text-center text-gray-400 text-sm">No notifications</div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <StreakCounter streak={settings?.daily_streak || dailyStreak} />
               
               <DropdownMenu>
@@ -353,56 +401,6 @@ export default function Dashboard() {
               </div>
             </motion.div>
 
-            {/* Quick Actions */}
-            <motion.div variants={itemVariants} className="space-y-3">
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1">Quick Access</h3>
-
-              <Link to="/practice" className="block">
-                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-purple-300 transition-all group active:scale-[0.98]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                      <Zap className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">Global Practice</h4>
-                      <p className="text-xs text-gray-500">Mock questions & answers</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-purple-600" />
-                </div>
-              </Link>
-
-              <Link to="/questions" className="block">
-                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-indigo-300 transition-all group active:scale-[0.98]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                      <MessageSquareText className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">My Question Bank</h4>
-                      <p className="text-xs text-gray-500">Review your personal list</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-600" />
-                </div>
-              </Link>
-              
-              <Link to="/notes" className="block">
-                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:border-blue-300 transition-all group active:scale-[0.98]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <FileText className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">Study Notes</h4>
-                      <p className="text-xs text-gray-500">Your knowledge base</p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-600" />
-                </div>
-              </Link>
-            </motion.div>
-
             {/* Recent Progress */}
             <motion.div variants={itemVariants} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
@@ -417,25 +415,46 @@ export default function Dashboard() {
                   ((userProgress || []) as unknown as Progress[])
                     .filter(p => p.last_reviewed_at)
                     .sort((a, b) => new Date(b.last_reviewed_at!).getTime() - new Date(a.last_reviewed_at!).getTime())
-                    .slice(0, 4)
+                    .slice(0, 5)
                     .map((progress, idx) => {
+                       // 1. Try to find in GLOBAL modules
                        const modules = (studyModules || []) as unknown as Module[];
-                       const question = modules?.flatMap(m => m.questions || []).find(q => q.id === progress.question_id);
+                       let question = modules?.flatMap(m => m.questions || []).find(q => q.id === progress.question_id);
+                       let isPersonal = false;
+
+                       // 2. If not found, try to find in PERSONAL questions
+                       if (!question && personalQuestions) {
+                          const pQuestions = (personalQuestions as unknown as Question[]);
+                          question = pQuestions.find(q => q.id === progress.question_id);
+                          isPersonal = true;
+                       }
                        
                        if (!question) return null;
                        
                        return (
-                         <div key={idx} className="relative flex gap-3 items-start pl-2">
+                         <div key={idx} className="relative flex gap-3 items-start pl-2 group">
                            <div className={cn(
                              "w-2.5 h-2.5 mt-1 rounded-full z-10 ring-2 ring-white",
                              progress.status === 'Mastered' ? "bg-green-500" : "bg-amber-400"
                            )} />
                            <div className="flex-1 min-w-0">
-                             <p className="text-xs font-medium text-gray-900 truncate">{(question as any).question_text || "Unknown Question"}</p>
+                             <p className="text-xs font-medium text-gray-900 truncate" title={(question as any).question_text}>
+                                {(question as any).question_text || "Unknown Question"}
+                             </p>
                              <div className="flex items-center gap-2 mt-0.5">
-                               <span className="text-[10px] text-gray-400">
+                               <span className="text-[10px] text-gray-400 flex items-center gap-1">
                                  {new Date(progress.last_reviewed_at!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                </span>
+                               {/* Source Badge */}
+                               {isPersonal ? (
+                                 <span className="text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                    <Lock className="w-2 h-2" /> Personal
+                                 </span>
+                               ) : (
+                                 <span className="text-[9px] bg-gray-50 text-gray-500 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                    <Globe className="w-2 h-2" /> Global
+                                 </span>
+                               )}
                              </div>
                            </div>
                          </div>
