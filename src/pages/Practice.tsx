@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle
-} from '@/components/ui/sheet'; // Import Sheet for Mobile Sidebar
+} from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -28,13 +28,11 @@ import {
   useDeleteGlobalQuestion, 
   Question 
 } from '@/hooks/useStudyModules';
-// 👇 NEW IMPORTS HERE
 import { 
   useImportGlobalQuestions, 
   useToggleQuestionProgress, 
   useUserProgress 
 } from '@/hooks/useUserQuestions';
-
 import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -43,10 +41,10 @@ import { cn } from '@/lib/utils';
 function QuestionCard({ question, isAuthor, isMastered, onEdit, onDelete, onToggleMastered }: { 
   question: Question; 
   isAuthor: boolean; 
-  isMastered: boolean; // New Prop
+  isMastered: boolean; 
   onEdit: () => void; 
   onDelete: () => void;
-  onToggleMastered: () => void; // New Prop
+  onToggleMastered: () => void; 
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -148,7 +146,7 @@ export default function Practice() {
   const updateQuestion = useUpdateGlobalQuestion();
   const deleteQuestion = useDeleteGlobalQuestion();
   
-  // NEW HOOKS FOR FEATURES
+  // NEW HOOKS
   const importQuestions = useImportGlobalQuestions();
   const toggleProgress = useToggleQuestionProgress();
   const { data: userProgress } = useUserProgress();
@@ -158,7 +156,7 @@ export default function Practice() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isContributeOpen, setIsContributeOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editForm, setEditForm] = useState({ question: '', answer: '', difficulty: 'Medium' });
@@ -222,7 +220,7 @@ export default function Practice() {
     }
   };
 
-  // --- NEW HANDLERS ---
+  // --- HANDLERS ---
   const handleImportToBank = async () => {
     if (!selectedModule) return;
     if (!confirm(`Import all questions from "${selectedModule.title}" to your Personal Bank?`)) return;
@@ -242,7 +240,6 @@ export default function Practice() {
      });
      if (!currentStatus) toast.success("Marked as Mastered! 🎉");
   };
-  // --------------------
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="h-full flex flex-col">
@@ -368,7 +365,6 @@ export default function Practice() {
                  <div className="text-center py-10 text-slate-400">No questions yet. Be the first to add one!</div>
                )}
                {selectedModule.questions?.map((q: Question) => {
-                 // Check Mastery Status
                  const isMastered = userProgress?.some(
                     p => p.question_id === q.id && p.status === 'Mastered'
                  ) || false;

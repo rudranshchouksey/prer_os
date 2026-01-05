@@ -79,7 +79,7 @@ export function useDeleteUserQuestion() {
 
 // --- NEW FEATURES ---
 
-// 5. IMPORT Global Questions to Personal Bank (Fixes 'title' error)
+// 5. IMPORT Global Questions to Personal Bank
 export function useImportGlobalQuestions() {
   const queryClient = useQueryClient();
 
@@ -89,7 +89,6 @@ export function useImportGlobalQuestions() {
       if (!user) throw new Error('User not found');
 
       // A. Get Module Title
-      // We retrieve 'data' and safely cast it to 'any' to access 'title'
       const { data: moduleData, error: moduleError } = await supabase
         .from('study_modules' as any)
         .select('title')
@@ -98,7 +97,6 @@ export function useImportGlobalQuestions() {
       
       if (moduleError) throw moduleError;
       
-      // Safe access: If data is null/undefined, fallback to 'Imported'
       const categoryName = (moduleData as any)?.title || 'Imported';
 
       // B. Fetch Global Questions
@@ -118,7 +116,7 @@ export function useImportGlobalQuestions() {
         question_text: q.question_text,
         answer_text: q.answer_text,
         difficulty: q.difficulty,
-        category: categoryName, // Uses the fetched title
+        category: categoryName,
         tags: ['Imported']
       }));
 
@@ -146,7 +144,6 @@ export function useToggleQuestionProgress() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not found");
 
-      // Upsert: Insert if new, Update if exists
       const { error } = await supabase
         .from('user_progress' as any)
         .upsert({
@@ -159,15 +156,13 @@ export function useToggleQuestionProgress() {
       if (error) throw error;
     },
     onSuccess: () => {
-      // Refresh progress so UI updates (green checkmark)
       queryClient.invalidateQueries({ queryKey: ['user_progress'] });
-      // Refresh modules so dashboard stats update
       queryClient.invalidateQueries({ queryKey: ['study_modules'] });
     }
   });
 }
 
-// 7. GET USER PROGRESS (Needed to show checkmarks)
+// 7. GET USER PROGRESS
 export function useUserProgress() {
   return useQuery({
     queryKey: ['user_progress'],
