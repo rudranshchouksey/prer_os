@@ -18,6 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserTasks, useCreateTask, useUpdateTask, useDeleteTask, UserTask } from '@/hooks/useUserTasks';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 1. IMPORT NOTIFICATION
 import { toast } from 'sonner';
 
 // dnd-kit imports
@@ -192,6 +193,7 @@ export default function StudyPlan() {
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const addNotification = useAddNotification(); // 👈 2. INIT NOTIFICATION
   
   const [newItemTitle, setNewItemTitle] = useState('');
   const [activeTask, setActiveTask] = useState<UserTask | null>(null);
@@ -211,6 +213,15 @@ export default function StudyPlan() {
       onSuccess: () => {
         setNewItemTitle('');
         toast.success('Task added');
+
+        // 👈 3. NOTIFY ON ADD
+        if (user) {
+            addNotification.mutate({
+                userId: user.id,
+                title: 'New Goal Set 🎯',
+                message: `Added to your plan: "${title.trim()}"`
+            });
+        }
       }
     });
   };
@@ -234,7 +245,17 @@ export default function StudyPlan() {
     // Dropped on a column directly
     if (columns.some(c => c.id === over.id)) {
         if (activeTask.category !== over.id) {
-            updateTask.mutate({ id: activeTask.id, category: over.id as ColumnType });
+            const newCategory = over.id as ColumnType;
+            updateTask.mutate({ id: activeTask.id, category: newCategory });
+
+            // 👈 4. NOTIFY ON COMPLETION
+            if (newCategory === 'applied' && user) {
+                addNotification.mutate({
+                    userId: user.id,
+                    title: 'Task Completed ✅',
+                    message: `Great job completing "${activeTask.title}"!`
+                });
+            }
         }
         return;
     }
@@ -243,6 +264,15 @@ export default function StudyPlan() {
     const overTask = tasks.find(t => t.id === over.id);
     if (overTask && overTask.category !== activeTask.category) {
         updateTask.mutate({ id: activeTask.id, category: overTask.category });
+        
+        // 👈 5. NOTIFY ON COMPLETION (via drag-to-task)
+        if (overTask.category === 'applied' && user) {
+            addNotification.mutate({
+                userId: user.id,
+                title: 'Task Completed ✅',
+                message: `Great job completing "${activeTask.title}"!`
+            });
+        }
     }
   };
 

@@ -18,6 +18,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { MacCodeBlock, MarkdownContent } from '@/components/CodeBlock';
 import { useUserNotes, useCreateNote, useUpdateNote, useDeleteNote, UserNote } from '@/hooks/useUserNotes';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 1. IMPORT NOTIFICATION HOOK
+import { useAuth } from '@/contexts/AuthContext'; // 👈 2. IMPORT AUTH
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -193,6 +195,8 @@ export default function StudyNotes() {
   const [isCreating, setIsCreating] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
+  const { user } = useAuth(); // 👈 3. GET USER
+  const addNotification = useAddNotification(); // 👈 4. INIT NOTIFICATION
   const { data: notes = [], isLoading } = useUserNotes();
   const createNote = useCreateNote();
   const updateNote = useUpdateNote();
@@ -213,6 +217,15 @@ export default function StudyNotes() {
       await createNote.mutateAsync(data);
       toast.success('Note created successfully');
       setIsCreating(false);
+
+      // 👈 5. TRIGGER NOTIFICATION
+      if (user) {
+        addNotification.mutate({
+            userId: user.id,
+            title: 'New Study Note 📒',
+            message: `You added a new note: "${data.title}"`
+        });
+      }
     } catch (error) {
       toast.error('Failed to create note');
     }
@@ -225,6 +238,15 @@ export default function StudyNotes() {
       toast.success('Note updated successfully');
       setIsEditing(false);
       setSelectedNote({ ...selectedNote, ...data });
+
+      // 👈 6. TRIGGER NOTIFICATION
+      if (user) {
+        addNotification.mutate({
+            userId: user.id,
+            title: 'Note Updated 📝',
+            message: `You updated your note: "${data.title}"`
+        });
+      }
     } catch (error) {
       toast.error('Failed to update note');
     }
