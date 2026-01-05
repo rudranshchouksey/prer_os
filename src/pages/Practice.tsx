@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronRight, ChevronDown, Plus, Search, 
   MessageSquareText, Loader2, Users, CheckCircle2,
-  Pencil, Trash2, Zap
+  Pencil, Trash2, Zap, Menu, Filter
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,9 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle
+} from '@/components/ui/sheet'; // Import Sheet for Mobile Sidebar
 import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -108,10 +111,10 @@ export default function Practice() {
   
   const { user } = useAuth();
   
-  const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isContributeOpen, setIsContributeOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Sheet State
   
   // Edit State
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -176,58 +179,96 @@ export default function Practice() {
     }
   };
 
+  // Reusable Sidebar Content for both Desktop and Mobile
+  const SidebarContent = ({ isMobile = false }) => (
+    <div className="h-full flex flex-col">
+       <div className={cn("p-4 border-b border-slate-100 bg-slate-50/50", isMobile && "pt-6")}>
+          <h2 className="font-bold text-slate-800 flex items-center gap-2">
+             <Users className="w-5 h-5 text-indigo-600" /> Community Practice
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 ml-7">Global question bank</p>
+       </div>
+       
+       <div className="flex-1 overflow-y-auto p-2">
+         {categories.map(cat => (
+           <div key={cat}>
+             <button 
+               onClick={() => toggleCategory(cat)}
+               className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+             >
+               <span className="flex items-center gap-2">
+                 {expandedCategories.has(cat) ? <ChevronDown className="w-4 h-4 text-slate-400"/> : <ChevronRight className="w-4 h-4 text-slate-400"/>}
+                 <span className={cn(expandedCategories.has(cat) && "text-indigo-600")}>{cat}</span>
+               </span>
+             </button>
+             
+             {expandedCategories.has(cat) && (
+               <div className="pl-6 mt-1 space-y-1">
+                 {categorizedModules[cat]?.map(mod => (
+                   <button
+                     key={mod.id}
+                     onClick={() => {
+                        setSelectedModuleId(mod.id);
+                        if(isMobile) setIsMobileMenuOpen(false); // Close sheet on mobile selection
+                     }}
+                     className={cn(
+                       "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
+                       selectedModuleId === mod.id ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                     )}
+                   >
+                     {mod.title}
+                   </button>
+                 ))}
+               </div>
+             )}
+           </div>
+         ))}
+       </div>
+    </div>
+  );
+
   if (isLoading) return <MainLayout><div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin" /></div></MainLayout>;
 
   return (
     <MainLayout>
-      <div className="flex h-[calc(100vh-theme(spacing.16))] md:h-[calc(100vh-theme(spacing.8))] bg-white md:rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-theme(spacing.8))] bg-white md:rounded-2xl border border-slate-200 overflow-hidden">
         
-        {/* SIDEBAR */}
-        <aside className="w-80 bg-white border-r border-slate-200 flex flex-col  md:flex">
-           <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                 <Users className="w-5 h-5 text-indigo-600" /> Community Practice
-              </h2>
-              <p className="text-xs text-slate-500 mt-1 ml-7">Global question bank</p>
-           </div>
-           
-           <div className="flex-1 overflow-y-auto p-2">
-             {categories.map(cat => (
-               <div key={cat}>
-                 <button 
-                   onClick={() => toggleCategory(cat)}
-                   className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-                 >
-                   <span className="flex items-center gap-2">
-                     {expandedCategories.has(cat) ? <ChevronDown className="w-4 h-4 text-slate-400"/> : <ChevronRight className="w-4 h-4 text-slate-400"/>}
-                     <span className={cn(expandedCategories.has(cat) && "text-indigo-600")}>{cat}</span>
-                   </span>
-                 </button>
-                 
-                 {expandedCategories.has(cat) && (
-                   <div className="pl-6 mt-1 space-y-1">
-                     {categorizedModules[cat]?.map(mod => (
-                       <button
-                         key={mod.id}
-                         onClick={() => setSelectedModuleId(mod.id)}
-                         className={cn(
-                           "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
-                           selectedModuleId === mod.id ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                         )}
-                       >
-                         {mod.title}
-                       </button>
-                     ))}
-                   </div>
-                 )}
-               </div>
-             ))}
-           </div>
+        {/* DESKTOP SIDEBAR (Hidden on Mobile) */}
+        <aside className="w-80 bg-white border-r border-slate-200 hidden md:flex flex-col">
+            <SidebarContent />
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto p-8">
-           <div className="flex justify-between items-center mb-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+           
+           {/* MOBILE: HEADER & TOPIC SELECTOR */}
+           <div className="md:hidden mb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                 <h1 className="text-2xl font-serif font-bold text-slate-900">Practice</h1>
+                 <Button onClick={() => setIsContributeOpen(true)} size="sm" className="bg-slate-900 text-white">
+                    <Plus className="w-4 h-4" />
+                 </Button>
+              </div>
+
+              {/* Mobile Topic Trigger */}
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                 <SheetTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between bg-slate-50 border-slate-200 text-slate-700">
+                       <span className="flex items-center gap-2">
+                          <Filter className="w-4 h-4"/> 
+                          {selectedModule ? selectedModule.title : "Browse Topics"}
+                       </span>
+                       <ChevronDown className="w-4 h-4 opacity-50"/>
+                    </Button>
+                 </SheetTrigger>
+                 <SheetContent side="left" className="p-0 w-80">
+                    <SidebarContent isMobile={true} />
+                 </SheetContent>
+              </Sheet>
+           </div>
+
+           {/* DESKTOP: HEADER */}
+           <div className="hidden md:flex justify-between items-center mb-8">
               <div>
                 <h1 className="text-3xl font-serif font-bold text-slate-900">
                   {selectedModule ? selectedModule.title : "Practice"}
@@ -241,8 +282,9 @@ export default function Practice() {
               </Button>
            </div>
 
+           {/* CONTENT AREA */}
            {selectedModule ? (
-             <div className="space-y-4">
+             <div className="space-y-4 pb-20 md:pb-0">
                {selectedModule.questions?.length === 0 && (
                  <div className="text-center py-10 text-slate-400">No questions yet. Be the first to add one!</div>
                )}
@@ -257,9 +299,10 @@ export default function Practice() {
                ))}
              </div>
            ) : (
-             <div className="flex h-64 flex-col items-center justify-center text-slate-400">
+             <div className="flex flex-col items-center justify-center text-slate-400 py-20 md:h-96">
                <Zap className="w-16 h-16 opacity-10 mb-4" />
-               <p>Select a category from the sidebar</p>
+               <p className="hidden md:block">Select a category from the sidebar</p>
+               <p className="md:hidden">Tap "Browse Topics" above to start</p>
              </div>
            )}
         </main>
