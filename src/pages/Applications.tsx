@@ -40,7 +40,6 @@ import {
   Link as LinkIcon,
   Columns,
   Layout,
-  // Added missing imports here:
   CheckCircle2,
   TrendingUp
 } from 'lucide-react';
@@ -81,6 +80,8 @@ import {
   ApplicationStatus,
 } from '@/hooks/useJobApplications';
 import { generateCoverLetter } from '@/services/ai';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 1. IMPORT NOTIFICATION HOOK
+import { useAuth } from '@/contexts/AuthContext'; // 👈 2. IMPORT AUTH
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router-dom';
@@ -93,7 +94,6 @@ function useHorizontalScroll() {
     if (el) {
       const onWheel = (e: WheelEvent) => {
         if (e.deltaY === 0) return;
-        // Only hijack vertical scroll if we are on a desktop-like view
         if (window.innerWidth >= 768) { 
             e.preventDefault();
             el.scrollBy({ left: e.deltaY, behavior: 'smooth' });
@@ -134,6 +134,8 @@ function ApplicationCard({
   isCompact?: boolean;
 }) {
   const deleteApplication = useDeleteJobApplication();
+  const addNotification = useAddNotification(); // 👈 Init Hook
+  const { user } = useAuth(); // 👈 Get User
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const formatSalary = (min: number | null, max: number | null, currency: string | null) => {
@@ -153,7 +155,19 @@ function ApplicationCard({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Delete this application?')) {
-      deleteApplication.mutate(application.id, { onSuccess: () => toast.success('Deleted successfully') });
+      deleteApplication.mutate(application.id, { 
+        onSuccess: () => { 
+            toast.success('Deleted successfully');
+            // 👈 Notify Delete
+            if (user) {
+                addNotification.mutate({
+                    userId: user.id,
+                    title: 'Application Removed 🗑️',
+                    message: `You removed ${application.company_name} from your board.`
+                });
+            }
+        } 
+      });
     }
   };
 
@@ -180,7 +194,6 @@ function ApplicationCard({
         )}
       >
         {!isCompact && (
-          // Grip visible on Hover (Desktop) or Always (Mobile)
           <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-300 md:opacity-0 md:group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1">
              <GripVertical className="w-4 h-4" />
           </div>
@@ -286,8 +299,6 @@ function KanbanColumn({
   return (
     <div className={cn(
         "flex-shrink-0 h-full snap-center first:pl-0 transition-all duration-300",
-        // MOBILE: Always 85vw to allow snap scrolling peek
-        // DESKTOP: Flex-1 if compact, w-80 if normal
         isCompact ? "w-[85vw] md:w-auto md:flex-1 md:min-w-[180px]" : "w-[85vw] md:w-80"
     )}>
       <div 
@@ -349,6 +360,8 @@ function ApplicationFormModal({
 }) {
   const createApplication = useCreateJobApplication();
   const updateApplication = useUpdateJobApplication();
+  const addNotification = useAddNotification(); // 👈 Init Hook
+  const { user } = useAuth(); // 👈 Get User
   
   const [formData, setFormData] = useState({
     company_name: '',
@@ -405,11 +418,33 @@ function ApplicationFormModal({
 
     if (mode === 'create') {
       createApplication.mutate({ ...payload, company_logo: null, sort_order: 0 }, {
-        onSuccess: () => { toast.success('Added successfully'); onClose(); }
+        onSuccess: () => { 
+            toast.success('Added successfully'); 
+            // 👈 Notify Create
+            if (user) {
+                addNotification.mutate({
+                    userId: user.id,
+                    title: 'New Application 💼',
+                    message: `Good luck! You applied to ${formData.company_name}.`
+                });
+            }
+            onClose(); 
+        }
       });
     } else if (application) {
       updateApplication.mutate({ id: application.id, ...payload }, {
-        onSuccess: () => { toast.success('Updated successfully'); onClose(); }
+        onSuccess: () => { 
+            toast.success('Updated successfully'); 
+            // 👈 Notify Update
+            if (user) {
+                addNotification.mutate({
+                    userId: user.id,
+                    title: 'Application Updated 📝',
+                    message: `Updated details for ${formData.company_name}.`
+                });
+            }
+            onClose(); 
+        }
       });
     }
   };
@@ -498,6 +533,9 @@ function EditApplicationModal(props: { application: JobApplication, isOpen: bool
 export default function Applications() {
   const { data: applications, isLoading } = useJobApplications();
   const updateApplication = useUpdateJobApplication();
+  const addNotification = useAddNotification(); // 👈 Init Hook
+  const { user } = useAuth(); // 👈 Get User
+  
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -549,15 +587,31 @@ export default function Applications() {
 
     const overId = over.id.toString();
     
+    // Helper to notify
+    const notifyMove = (statusId: string) => {
+        if (user) {
+            const statusLabel = APPLICATION_STATUSES.find(s => s.id === statusId)?.label || 'New Status';
+            addNotification.mutate({
+                userId: user.id,
+                title: 'Status Updated 🚀',
+                message: `Moved ${activeApp.company_name} to ${statusLabel}`
+            });
+        }
+    };
+
     if (overId.startsWith('column-')) {
       const newStatus = overId.replace('column-', '') as ApplicationStatus;
-      if (newStatus !== activeApp.status) updateApplication.mutate({ id: activeApp.id, status: newStatus });
+      if (newStatus !== activeApp.status) {
+          updateApplication.mutate({ id: activeApp.id, status: newStatus });
+          notifyMove(newStatus); // 👈 Notify Drag (Column Drop)
+      }
       return;
     }
 
     const overApp = applications?.find((a) => a.id === over.id);
     if (overApp && overApp.status !== activeApp.status) {
       updateApplication.mutate({ id: activeApp.id, status: overApp.status });
+      notifyMove(overApp.status); // 👈 Notify Drag (Card Drop)
     }
   };
 
