@@ -29,6 +29,8 @@ import {
   useToggleQuestionProgress, 
   UserQuestion 
 } from '@/hooks/useUserQuestions';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 1. IMPORT THIS
+import { useAuth } from '@/contexts/AuthContext'; // 👈 Import Auth to get User ID
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -41,6 +43,7 @@ import {
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
 
 export default function InterviewReady() {
+  const { user } = useAuth(); // 👈 Get User
   const { data: myQuestions, isLoading } = useUserQuestions();
   const { data: userProgress } = useUserProgress();
   
@@ -48,6 +51,7 @@ export default function InterviewReady() {
   const updateQ = useUpdateUserQuestion();
   const deleteQ = useDeleteUserQuestion();
   const toggleProgress = useToggleQuestionProgress();
+  const addNotification = useAddNotification(); // 👈 2. INITIALIZE HOOK
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -86,13 +90,29 @@ export default function InterviewReady() {
   }, [categoryNames]);
 
   const handleSave = async () => {
+    if (!user) return;
     try {
         if (editingQ) {
             await updateQ.mutateAsync({ id: editingQ.id, ...formData });
             toast.success("Question updated");
+            
+            // 👈 3. NOTIFY ON UPDATE
+            addNotification.mutate({
+               userId: user.id,
+               title: 'Question Updated 📝',
+               message: `You updated "${formData.question_text.substring(0, 20)}..." in your bank.`
+            });
+
         } else {
             await createQ.mutateAsync(formData);
             toast.success("Question added to personal bank");
+            
+            // 👈 4. NOTIFY ON CREATE
+            addNotification.mutate({
+               userId: user.id,
+               title: 'New Personal Question 🔐',
+               message: `You added a new ${formData.difficulty} question to ${formData.category}.`
+            });
         }
         setIsEditorOpen(false);
         setEditingQ(null);
@@ -114,10 +134,20 @@ export default function InterviewReady() {
       questionId: qId,
       status: currentStatus ? 'Review' : 'Mastered'
     });
-    if (!currentStatus) toast.success("Marked as Mastered!");
+    
+    // Optional: Notify when mastering
+    if (!currentStatus && user) {
+        // You can uncomment this if you want notifications for every mastery
+        /* addNotification.mutate({
+            userId: user.id,
+            title: 'Topic Mastered! 🎉',
+            message: 'Great job! One step closer to interview ready.'
+        }); 
+        */
+        toast.success("Marked as Mastered!");
+    }
   };
 
-  // Reusable Sidebar Content
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
         <div className="p-4 border-b border-slate-200 bg-white">
@@ -213,7 +243,7 @@ export default function InterviewReady() {
                     const isMastered = userProgress?.some(
                         p => p.question_id === q.id && p.status === 'Mastered'
                     ) || false;
-                    
+
                     return (
                         <SingleQuestionCard 
                             key={q.id}
@@ -285,7 +315,7 @@ export default function InterviewReady() {
   );
 }
 
-// --- SUB-COMPONENT FOR PREMIUM CARD LOOK ---
+// --- SUB-COMPONENT ---
 function SingleQuestionCard({ q, isMastered, onToggleMastered, onEdit, onDelete }: {
     q: UserQuestion, 
     isMastered: boolean, 
@@ -313,10 +343,8 @@ function SingleQuestionCard({ q, isMastered, onToggleMastered, onEdit, onDelete 
                     : "bg-white border-slate-200 hover:shadow-md"
             )}
         >
-            {/* Header Row */}
             <div className="flex justify-between items-start mb-6">
                 <div className="flex flex-wrap gap-2 items-center">
-                    {/* Pill Badge for Difficulty */}
                     <Badge variant="outline" className={cn(
                         "rounded-full px-3 py-1 text-xs font-medium border-0", 
                         difficultyColors[q.difficulty as keyof typeof difficultyColors]
@@ -324,7 +352,6 @@ function SingleQuestionCard({ q, isMastered, onToggleMastered, onEdit, onDelete 
                         {q.difficulty}
                     </Badge>
 
-                    {/* Tags as Pills */}
                     {q.tags?.map(tag => (
                         <Badge key={tag} variant="secondary" className="rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-normal">
                             {tag}
@@ -332,34 +359,27 @@ function SingleQuestionCard({ q, isMastered, onToggleMastered, onEdit, onDelete 
                     ))}
                 </div>
 
-                {/* PREMIUM MASTERED BUTTON */}
                 <Button
                     onClick={(e) => {
-                        e.stopPropagation(); // Prevents card expansion
+                        e.stopPropagation(); 
                         onToggleMastered(q.id, isMastered);
                     }}
                     className={cn(
                         "rounded-full px-4 py-1.5 h-auto text-sm font-medium transition-all shadow-none",
-                        // 👇 This logic handles the GREEN color change
                         isMastered 
                         ? "bg-green-600 hover:bg-green-700 text-white" 
                         : "bg-transparent hover:bg-slate-50 text-slate-400 hover:text-slate-600 border border-transparent hover:border-slate-200"
                     )}
                 >
-                    {/* 👇 This logic handles the ICON change (Check vs Circle) */}
                     {isMastered ? <Check className="w-4 h-4 mr-1.5" /> : <Circle className="w-4 h-4 mr-1.5" />}
-                    
-                    {/* 👇 This logic handles the TEXT change ("Mastered" vs "Mark as Mastered") */}
                     {isMastered ? "Mastered" : "Mark as Mastered"}
                 </Button>
             </div>
 
-            {/* Question Text */}
             <h3 className="text-xl font-serif text-slate-900 mb-4 leading-relaxed pr-8">
                 {q.question_text}
             </h3>
             
-            {/* Show Answer Toggle */}
             <div className="mt-2">
                 <button 
                     onClick={() => setIsOpen(!isOpen)} 
@@ -386,7 +406,6 @@ function SingleQuestionCard({ q, isMastered, onToggleMastered, onEdit, onDelete 
                 )}
             </AnimatePresence>
 
-            {/* ACTIONS: Edit/Delete (Bottom Right, Visible on Hover) */}
             <div className="absolute bottom-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="ghost" size="icon" onClick={() => onEdit(q)} className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full">
                     <Pencil className="w-4 h-4" />

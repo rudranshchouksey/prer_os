@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCreateStudyModule, useCreateGlobalQuestion } from '@/hooks/useStudyModules';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 1. IMPORT NOTIFICATION HOOK
 
 interface ContributeQuestionModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
   // Hooks
   const createModule = useCreateStudyModule();
   const createQuestion = useCreateGlobalQuestion();
+  const addNotification = useAddNotification(); // 👈 2. INITIALIZE HOOK
 
   const isLoading = createModule.isPending || createQuestion.isPending;
 
@@ -108,6 +110,15 @@ export function ContributeQuestionModal({ isOpen, onClose, modules }: Contribute
       });
 
       toast.success('Question submitted successfully!');
+
+      // 👈 3. TRIGGER NOTIFICATION
+      if (user) {
+         addNotification.mutate({
+            userId: user.id,
+            title: 'Contribution Submitted 🚀',
+            message: 'Thanks for adding a question to the community! It is now live.'
+         });
+      }
       
       // Reset Form
       setQuestion('');
