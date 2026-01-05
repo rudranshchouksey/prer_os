@@ -20,6 +20,8 @@ import { useUserProgress } from '@/hooks/useUserProgress';
 import { useStudyModules } from '@/hooks/useStudyModules';
 import { useUserQuestions } from '@/hooks/useUserQuestions'; 
 import { useUserNotes } from '@/hooks/useUserNotes';
+// 👇 NEW IMPORT
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/useNotifications';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuLabel, DropdownMenuSeparator
@@ -59,14 +61,21 @@ interface StatCardProps {
   mobileCompact?: boolean;
 }
 
-// --- Mock Notifications Data (Ideally fetch from DB) ---
-const INITIAL_NOTIFICATIONS = [
-  { id: 1, title: 'Keep it up!', message: 'You are on a 3-day streak. 🔥', time: '2 hours ago', read: false },
-  { id: 2, title: 'New Topic', message: 'System Design questions added.', time: '5 hours ago', read: false },
-  { id: 3, title: 'Welcome', message: 'Thanks for joining PrepOS!', time: '1 day ago', read: true },
-];
+// --- Helper: Time Ago ---
+function formatTimeAgo(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
-// --- Animation Variants ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -89,17 +98,19 @@ export default function Dashboard() {
   const { data: settings } = useUserSettings();
   const { trackActivity } = useTrackActivity();
   
-  // Data Hooks
   const { data: userProgress } = useUserProgress();
   const { data: studyModules } = useStudyModules();
   const { data: personalQuestions } = useUserQuestions();
   const { data: personalNotes } = useUserNotes();
 
+  // 👇 REAL NOTIFICATIONS HOOKS
+  const { data: notifications } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+
   const [showDateInput, setShowDateInput] = useState(false);
   
-  // Notification State
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   useEffect(() => {
     trackActivity();
@@ -168,14 +179,6 @@ export default function Dashboard() {
     }
   };
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
-
-  const markRead = (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
-
   return (
     <MainLayout className="bg-gray-50/50">
       <motion.div
@@ -202,7 +205,7 @@ export default function Dashboard() {
               {/* NOTIFICATIONS DROPDOWN */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 relative">
+                  <Button variant="outline" size="icon" className="rounded-full border-gray-200 bg-white shadow-sm text-gray-500 hover:text-gray-700 relative">
                     <Bell className="w-5 h-5" />
                     {unreadCount > 0 && (
                       <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white animate-pulse" />
@@ -213,36 +216,41 @@ export default function Dashboard() {
                   <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-lg">
                     <h4 className="font-semibold text-sm">Notifications</h4>
                     {unreadCount > 0 && (
-                      <button onClick={markAllRead} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                      <button 
+                        onClick={() => markAllRead.mutate()} 
+                        disabled={markAllRead.isPending}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
                         Mark all read
                       </button>
                     )}
                   </div>
                   <ScrollArea className="h-[300px]">
                     <div className="flex flex-col">
-                      {notifications.map((n) => (
-                        <button
-                          key={n.id}
-                          onClick={() => markRead(n.id)}
-                          className={cn(
-                            "flex items-start gap-3 p-4 text-left transition-colors border-b border-gray-50 last:border-0 hover:bg-gray-50",
-                            n.read ? "bg-white" : "bg-blue-50/30"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-2 h-2 mt-1.5 rounded-full shrink-0",
-                            n.read ? "bg-gray-200" : "bg-indigo-500"
-                          )} />
-                          <div>
-                            <p className={cn("text-sm font-medium", n.read ? "text-gray-700" : "text-gray-900")}>
-                              {n.title}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                            <span className="text-[10px] text-gray-400 mt-1 block">{n.time}</span>
-                          </div>
-                        </button>
-                      ))}
-                      {notifications.length === 0 && (
+                      {notifications && notifications.length > 0 ? (
+                        notifications.map((n) => (
+                          <button
+                            key={n.id}
+                            onClick={() => !n.read && markRead.mutate(n.id)}
+                            className={cn(
+                              "flex items-start gap-3 p-4 text-left transition-colors border-b border-gray-50 last:border-0 hover:bg-gray-50",
+                              n.read ? "bg-white" : "bg-blue-50/30"
+                            )}
+                          >
+                            <div className={cn(
+                              "w-2 h-2 mt-1.5 rounded-full shrink-0",
+                              n.read ? "bg-gray-200" : "bg-indigo-500"
+                            )} />
+                            <div>
+                              <p className={cn("text-sm font-medium", n.read ? "text-gray-700" : "text-gray-900")}>
+                                {n.title}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                              <span className="text-[10px] text-gray-400 mt-1 block">{formatTimeAgo(n.created_at)}</span>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
                          <div className="p-8 text-center text-gray-400 text-sm">No notifications</div>
                       )}
                     </div>
@@ -401,7 +409,7 @@ export default function Dashboard() {
               </div>
             </motion.div>
 
-            {/* Recent Progress */}
+            {/* Recent Progress (Dynamic) */}
             <motion.div variants={itemVariants} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 text-sm">Recent Progress</h3>

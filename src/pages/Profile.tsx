@@ -16,6 +16,7 @@ import { useProgressStats } from '@/hooks/useUserProgress';
 import { useUserSettings, useUpdateSettings } from '@/hooks/useUserSettings';
 import { useStudyModules } from '@/hooks/useStudyModules';
 import { useUserQuestions } from '@/hooks/useUserQuestions';
+import { useAddNotification } from '@/hooks/useNotifications'; // 👈 Imported Notification Hook
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,8 +42,10 @@ export default function Profile() {
   const { data: settings } = useUserSettings();
   const updateSettings = useUpdateSettings();
   
+  // Data Hooks
   const { data: studyModules, isLoading: modulesLoading } = useStudyModules();
   const { data: recentQuestions } = useUserQuestions();
+  const addNotification = useAddNotification(); // 👈 Initialize Notification Trigger
   
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -80,7 +83,7 @@ export default function Profile() {
       if (data) {
         setDisplayName(data.name || '');
         setAvatarUrl(data.avatar_url || '');
-        // 👇 FIX 1: Cast to 'any' to bypass missing type definition
+        // Fix for missing type definition on local setup
         setCoverUrl((data as any).cover_url || ''); 
       }
       return data;
@@ -119,7 +122,7 @@ export default function Profile() {
       if (!user) throw new Error('Not authenticated');
       const { error } = await supabase
         .from('profiles')
-        // 👇 FIX 2: Cast to 'any' here as well
+        // Cast to 'any' to avoid type error if column isn't in types yet
         .update({ name, avatar_url, cover_url } as any) 
         .eq('id', user.id);
       if (error) throw error;
@@ -128,6 +131,15 @@ export default function Profile() {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast.success('Profile updated');
       setIsEditing(false);
+
+      // 👇 SEND NOTIFICATION ON SUCCESS
+      if (user) {
+        addNotification.mutate({
+            userId: user.id,
+            title: 'Profile Updated 🛠️',
+            message: 'You successfully updated your profile details.'
+        });
+      }
     },
     onError: () => toast.error('Failed to update profile')
   });
@@ -150,6 +162,16 @@ export default function Profile() {
       await updateSettings.mutateAsync({
         interested_categories: selectedTracks.length > 0 ? selectedTracks : null
       });
+      
+      // Notify on track save
+      if (user) {
+        addNotification.mutate({
+            userId: user.id,
+            title: 'Learning Path Updated 🎯',
+            message: `You updated your focus topics.`
+        });
+      }
+      
       toast.success('Learning path updated');
     } catch {
       toast.error('Failed to save preferences');
