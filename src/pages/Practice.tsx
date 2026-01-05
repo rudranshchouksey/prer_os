@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChevronRight, ChevronDown, Plus, Search, 
   MessageSquareText, Loader2, Users, CheckCircle2,
-  Pencil, Trash2, Zap, Menu, Filter
+  Pencil, Trash2, Zap, Menu, Filter, CopyPlus, Check, Circle
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -28,16 +28,25 @@ import {
   useDeleteGlobalQuestion, 
   Question 
 } from '@/hooks/useStudyModules';
+// 👇 NEW IMPORTS HERE
+import { 
+  useImportGlobalQuestions, 
+  useToggleQuestionProgress, 
+  useUserProgress 
+} from '@/hooks/useUserQuestions';
+
 import { ContributeQuestionModal } from '@/components/ContributeQuestionModal';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // --- QUESTION CARD COMPONENT ---
-function QuestionCard({ question, isAuthor, onEdit, onDelete }: { 
+function QuestionCard({ question, isAuthor, isMastered, onEdit, onDelete, onToggleMastered }: { 
   question: Question; 
   isAuthor: boolean; 
+  isMastered: boolean; // New Prop
   onEdit: () => void; 
-  onDelete: () => void; 
+  onDelete: () => void;
+  onToggleMastered: () => void; // New Prop
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -48,10 +57,51 @@ function QuestionCard({ question, isAuthor, onEdit, onDelete }: {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow group relative">
+    <div className={cn(
+      "bg-white border rounded-xl p-5 shadow-sm hover:shadow-md transition-all group relative",
+      isMastered ? "border-green-200 bg-green-50/10" : "border-slate-200"
+    )}>
+      
+      {/* HEADER: Difficulty + Mastered Button */}
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex gap-2">
+          <Badge variant="outline" className={cn("text-[10px]", difficultyStyles[question.difficulty as keyof typeof difficultyStyles])}>
+            {question.difficulty}
+          </Badge>
+          {question.tags?.map(tag => (
+            <Badge key={tag} variant="secondary" className="text-[10px] bg-slate-100 text-slate-500">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+
+        {/* MARK AS MASTERED BUTTON */}
+        <Button
+          variant={isMastered ? "default" : "outline"}
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); onToggleMastered(); }}
+          className={cn(
+            "h-7 px-2 text-xs transition-colors",
+            isMastered 
+              ? "bg-green-600 hover:bg-green-700 text-white border-green-600" 
+              : "text-slate-500 border-slate-200 hover:border-green-500 hover:text-green-600"
+          )}
+        >
+          {isMastered ? (
+            <>
+              <Check className="w-3 h-3 mr-1.5" /> Mastered
+            </>
+          ) : (
+            <>
+              <Circle className="w-3 h-3 mr-1.5" /> Mark Mastered
+            </>
+          )}
+        </Button>
+      </div>
+
       {/* AUTHOR ACTIONS */}
       {isAuthor && (
-        <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute bottom-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
             <Pencil className="w-4 h-4 text-slate-400 hover:text-indigo-600" />
           </Button>
@@ -61,18 +111,7 @@ function QuestionCard({ question, isAuthor, onEdit, onDelete }: {
         </div>
       )}
 
-      <div className="flex gap-3 mb-3">
-        <Badge variant="outline" className={cn("text-[10px]", difficultyStyles[question.difficulty as keyof typeof difficultyStyles])}>
-          {question.difficulty}
-        </Badge>
-        {question.tags?.map(tag => (
-          <Badge key={tag} variant="secondary" className="text-[10px] bg-slate-100 text-slate-500">
-            {tag}
-          </Badge>
-        ))}
-      </div>
-
-      <h3 className="font-medium text-lg text-slate-900 mb-2">{question.question_text}</h3>
+      <h3 className="font-medium text-lg text-slate-900 mb-2 pr-12">{question.question_text}</h3>
       
       <div className="mt-4">
         <Button 
@@ -109,18 +148,22 @@ export default function Practice() {
   const updateQuestion = useUpdateGlobalQuestion();
   const deleteQuestion = useDeleteGlobalQuestion();
   
+  // NEW HOOKS FOR FEATURES
+  const importQuestions = useImportGlobalQuestions();
+  const toggleProgress = useToggleQuestionProgress();
+  const { data: userProgress } = useUserProgress();
+  
   const { user } = useAuth();
   
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [isContributeOpen, setIsContributeOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Sheet State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); 
   
-  // Edit State
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editForm, setEditForm] = useState({ question: '', answer: '', difficulty: 'Medium' });
 
-  // Group modules by Category
+  // Group modules
   const categorizedModules = useMemo(() => {
     if (!studyModules) return {};
     return studyModules.reduce((acc, module) => {
@@ -179,7 +222,28 @@ export default function Practice() {
     }
   };
 
-  // Reusable Sidebar Content for both Desktop and Mobile
+  // --- NEW HANDLERS ---
+  const handleImportToBank = async () => {
+    if (!selectedModule) return;
+    if (!confirm(`Import all questions from "${selectedModule.title}" to your Personal Bank?`)) return;
+
+    try {
+      const count = await importQuestions.mutateAsync(selectedModule.id);
+      toast.success(`Success! Imported ${count} questions to "My Questions".`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to import questions");
+    }
+  };
+
+  const handleToggleMastered = (qId: string, currentStatus: boolean) => {
+     toggleProgress.mutate({
+       questionId: qId,
+       status: currentStatus ? 'Review' : 'Mastered'
+     });
+     if (!currentStatus) toast.success("Marked as Mastered! 🎉");
+  };
+  // --------------------
+
   const SidebarContent = ({ isMobile = false }) => (
     <div className="h-full flex flex-col">
        <div className={cn("p-4 border-b border-slate-100 bg-slate-50/50", isMobile && "pt-6")}>
@@ -209,7 +273,7 @@ export default function Practice() {
                      key={mod.id}
                      onClick={() => {
                         setSelectedModuleId(mod.id);
-                        if(isMobile) setIsMobileMenuOpen(false); // Close sheet on mobile selection
+                        if(isMobile) setIsMobileMenuOpen(false);
                      }}
                      className={cn(
                        "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
@@ -233,7 +297,7 @@ export default function Practice() {
     <MainLayout>
       <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-theme(spacing.8))] bg-white md:rounded-2xl border border-slate-200 overflow-hidden">
         
-        {/* DESKTOP SIDEBAR (Hidden on Mobile) */}
+        {/* DESKTOP SIDEBAR */}
         <aside className="w-80 bg-white border-r border-slate-200 hidden md:flex flex-col">
             <SidebarContent />
         </aside>
@@ -250,7 +314,6 @@ export default function Practice() {
                  </Button>
               </div>
 
-              {/* Mobile Topic Trigger */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                  <SheetTrigger asChild>
                     <Button variant="outline" className="w-full justify-between bg-slate-50 border-slate-200 text-slate-700">
@@ -277,9 +340,25 @@ export default function Practice() {
                   {selectedModule ? selectedModule.description : "Select a topic to start practicing"}
                 </p>
               </div>
-              <Button onClick={() => setIsContributeOpen(true)} className="bg-slate-900 text-white hover:bg-slate-800">
-                 <Plus className="w-4 h-4 mr-2" /> Contribute
-              </Button>
+              
+              <div className="flex gap-2">
+                {/* IMPORT BUTTON */}
+                {selectedModule && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleImportToBank} 
+                    disabled={importQuestions.isPending}
+                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    {importQuestions.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2"/> : <CopyPlus className="w-4 h-4 mr-2" />}
+                    Save to My Bank
+                  </Button>
+                )}
+                
+                <Button onClick={() => setIsContributeOpen(true)} className="bg-slate-900 text-white hover:bg-slate-800">
+                   <Plus className="w-4 h-4 mr-2" /> Contribute
+                </Button>
+              </div>
            </div>
 
            {/* CONTENT AREA */}
@@ -288,15 +367,24 @@ export default function Practice() {
                {selectedModule.questions?.length === 0 && (
                  <div className="text-center py-10 text-slate-400">No questions yet. Be the first to add one!</div>
                )}
-               {selectedModule.questions?.map((q: Question) => (
-                 <QuestionCard 
-                    key={q.id} 
-                    question={q} 
-                    isAuthor={user?.id === q.created_by_id} 
-                    onEdit={() => handleEdit(q)}
-                    onDelete={() => handleDelete(q.id)}
-                 />
-               ))}
+               {selectedModule.questions?.map((q: Question) => {
+                 // Check Mastery Status
+                 const isMastered = userProgress?.some(
+                    p => p.question_id === q.id && p.status === 'Mastered'
+                 ) || false;
+
+                 return (
+                   <QuestionCard 
+                      key={q.id} 
+                      question={q} 
+                      isAuthor={user?.id === q.created_by_id} 
+                      isMastered={isMastered}
+                      onEdit={() => handleEdit(q)}
+                      onDelete={() => handleDelete(q.id)}
+                      onToggleMastered={() => handleToggleMastered(q.id, isMastered)}
+                   />
+                 );
+               })}
              </div>
            ) : (
              <div className="flex flex-col items-center justify-center text-slate-400 py-20 md:h-96">
